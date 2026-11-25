@@ -27,13 +27,14 @@ npm run dev
 
 Mở [localhost:5173](http://localhost:5173) để xem demo. API mặc định chạy ở cổng `3000`.
 
-## Chạy bằng Docker
+## Chạy bằng Docker Compose
 
-Từ thư mục gốc, build một image chứa cả NestJS và bản build React.
+Từ thư mục gốc, chạy các lệnh sau để build và khởi động một container chứa cả NestJS và bản build React.
 
 ```bash
-docker build -f backend/Dockerfile -t fedtraffic-backend .
-docker run --rm --env-file backend/.env.example -p 127.0.0.1:3000:3000 fedtraffic-backend
+cp -n backend/.env.example backend/.env
+docker compose up --build
 ```
 
 Mở [localhost:3000](http://localhost:3000) để xem trang chủ. API dùng cùng cổng với tiền tố `/api`.
+Nếu cổng `3000` đang bận, chạy `FEDTRAFFIC_PORT=3001 docker compose up --build` và mở [localhost:3001](http://localhost:3001).
