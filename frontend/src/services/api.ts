@@ -10,7 +10,7 @@ import type {
 /**
  * Tầng HTTP duy nhất của Frontend (Agents.md §6) — component không gọi fetch trực tiếp.
  */
-const apiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '')
+const apiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '') ?? ''
 const TIMEOUT_MS = 10_000
 
 export class ApiError extends Error {
@@ -31,7 +31,6 @@ function extractMessage(body: unknown): string | null {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!apiUrl) throw new ApiError('Chưa cấu hình VITE_API_URL cho frontend.', null)
   const timeout = AbortSignal.timeout(TIMEOUT_MS)
   const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
   let res: Response
