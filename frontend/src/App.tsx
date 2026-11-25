@@ -8,9 +8,9 @@ const DashboardPage = lazy(() => import('@/pages/dashboard-page'))
 const EdgeNodesPage = lazy(() => import('@/pages/edge-nodes-page'))
 
 const TITLES: Record<string, string> = {
-  '/': 'FedTraffic — Dự báo vận tốc giao thông thời gian thực (LSTM-FedProx)',
-  '/dashboard': 'Dashboard dự báo giao thông | FedTraffic',
-  '/edge-nodes': 'Cổng Edge Node & Cấu hình Agent | FedTraffic',
+  '/': 'bktraffic — Dự báo vận tốc giao thông thời gian thực (LSTM-FedProx)',
+  '/dashboard': 'Dashboard dự báo giao thông | bktraffic',
+  '/edge-nodes': 'Cổng Edge Node & Cấu hình Agent | bktraffic',
 }
 
 export default function App() {

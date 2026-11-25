@@ -24,7 +24,7 @@ export default function AppLayout() {
               <Activity className="size-5 text-ink-950" strokeWidth={2.5} />
             </span>
             <span className="text-lg font-bold tracking-tight text-white">
-              Fed<span className="text-brand">Traffic</span>
+              bk<span className="text-brand">traffic</span>
             </span>
           </Link>
 
@@ -93,7 +93,7 @@ export default function AppLayout() {
 
       {!fullBleed && (
         <footer className="border-t border-white/5 py-6 text-center text-xs text-muted-foreground">
-          FedTraffic Demo · Federated LSTM-FedProx · Node-Agent Architecture · Bản đồ © OpenStreetMap · Routing © OSRM
+          bktraffic · Federated LSTM-FedProx · Node-Agent Architecture · Bản đồ © OpenStreetMap · Routing © OSRM
         </footer>
       )}
     </div>
