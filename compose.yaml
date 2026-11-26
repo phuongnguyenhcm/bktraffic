@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     env_file:
-      - ./backend/.env
+      - ${ENV_FILE:-.env}
     environment:
       PORT: "3000"
     ports:

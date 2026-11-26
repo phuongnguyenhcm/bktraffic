@@ -26,6 +26,9 @@ export interface NodePrediction {
   confidence: number
   status: TrafficStatus
   timestamp: string
+  targetTimestamp: string | null
+  timeBucket: number | null
+  latestGeneratedAt: string | null
 }
 
 export interface MapNode extends InternalNode {
@@ -37,6 +40,9 @@ export interface MapNode extends InternalNode {
   confidence: number
   status: TrafficStatus
   timestamp: string
+  targetTimestamp: string | null
+  timeBucket: number | null
+  latestGeneratedAt: string | null
 }
 
 export interface MapEdge {
@@ -55,6 +61,9 @@ export interface MapEdge {
 export interface TrafficMapResponse {
   horizonMinutes: PredictionHorizon
   generatedAt: string
+  targetTimestamp: string | null
+  timeBucket: number | null
+  latestGeneratedAt: string | null
   dataTimestamp: string | null
   nodes: MapNode[]
   edges: MapEdge[]
