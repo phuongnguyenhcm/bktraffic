@@ -17,8 +17,8 @@ export class TrafficController {
     return this.traffic.getMap(query.horizon);
   }
 
-  /** GET /api/traffic/nodes/:id/history?limit=24 */
-  @Get('nodes/:id/history')
+  /** GET /api/traffic/nodes/:id?limit=24 */
+  @Get(['nodes/:id', 'nodes/:id/history'])
   getNodeHistory(@Param('id') id: string, @Query() query: HistoryQueryDto): Promise<NodeHistoryResponseDto> {
     return this.traffic.getNodeHistory(id, query.limit);
   }

@@ -29,12 +29,16 @@ Mở [localhost:5173](http://localhost:5173) để xem demo. API mặc định c
 
 ## Chạy bằng Docker Compose
 
-Từ thư mục gốc, chạy các lệnh sau để build và khởi động một container chứa cả NestJS và bản build React.
+Từ thư mục gốc, chạy các lệnh sau để khởi động ứng dụng NestJS/React và MongoDB cục bộ. MongoDB lưu dữ liệu và cache hình học trong volume `mongo_data`.
 
 ```bash
-cp -n backend/.env.example backend/.env
+cp -n .env.example .env
 docker compose up --build
 ```
 
 Mở [localhost:3000](http://localhost:3000) để xem trang chủ. API dùng cùng cổng với tiền tố `/api`.
-Nếu cổng `3000` đang bận, chạy `FEDTRAFFIC_PORT=3001 docker compose up --build` và mở [localhost:3001](http://localhost:3001).
+Nếu cổng `3000` đang bận, chạy `PORT=3001 docker compose up --build` và mở [localhost:3001](http://localhost:3001).
+
+Đặt `MONGODB_URI=mongodb://mongo:27017/traffic_db` trong tệp `.env` của Compose. Khi chạy backend trực tiếp trên máy, dùng `mongodb://localhost:27017/traffic_db` với cổng MongoDB mặc định.
+
+Trên máy chủ, có thể dùng `ENV_FILE=/etc/bktraffic/.env docker compose --env-file /etc/bktraffic/.env up --build`.

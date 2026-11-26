@@ -3,7 +3,7 @@
 ## Project Overview — BKTraffic
 
 **BKTraffic** is a Traffic Forecasting & Edge Management web application.
-- **Backend:** NestJS (ESM, Vitest, MongoDB Atlas via `@nestjs/mongoose`). In production, NestJS serves the pre-compiled React static assets (`frontend/dist`).
+- **Backend:** NestJS (ESM, Vitest, MongoDB via `@nestjs/mongoose`). In production, NestJS serves the pre-compiled React static assets (`frontend/dist`).
 - **Frontend:** React + Vite + Tailwind CSS + `shadcn/ui`.
 - **Environment & Secrets:** NEVER hardcode API keys, database URIs, or credentials in source files. Always isolate them in `.env` (loaded via `@nestjs/config` / `dotenv`) and never commit `.env` to Git.
 
@@ -48,7 +48,8 @@
 
 - **`dev` branch:** Active development containing full `backend/` and `frontend/` source code.
 - **`release/v1.0` branch:** Production release package with NestJS source at the repository root and pre-compiled React static assets in `frontend/dist/`.
-- **Docker:** Use a multi-stage `Dockerfile` (no frontend `node_modules` in the runtime image) orchestrated via `docker-compose.yml` (`bktraffic-app`). Ensure `ServeStaticModule` path matches the container's `/app/frontend/dist/` layout.
+- **Docker:** `compose.yaml` starts `bktraffic-app` after `mongo` is healthy. The multi-stage `backend/Dockerfile` serves the React build from `/app/frontend/dist/`. The app loads `${ENV_FILE:-.env}`.
+- **MongoDB:** Set `MONGODB_URI=mongodb://mongo:27017/traffic_db` in the Compose env file, or `mongodb://localhost:27017/traffic_db` for a backend running on the host with the default MongoDB port. The `mongo_data` volume stores the database, including the `polyline_caches` collection.
 
 ---
 
@@ -84,3 +85,20 @@ When a task says how to test, follow it. When it says nothing, cover the behavio
 ## Production data: NestJS Observe
 
 This app's production telemetry - traces, errors, logs and metrics - goes to [NestJS Observe](https://observe.nestjs.com). Until `ObserveModule` is registered in `src/app.module.ts`, nothing is sent: `npx @nestjs/observe link` sets it up in one step - it installs `@nestjs/observe`, wires it into the app, and writes the key pair (`OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET`) to `.env`.
+
+---
+
+## Traffic Graph & Map Visualization Standards (Dual Graph / Line Graph)
+
+1. **Semantic Definition of Nodes vs. Edges:**
+   - **Nodes = Physical Road Segments:** Each node represents a monitored road segment/sensor location and owns an independent `polyline` geometry (`[lat, lon][]`), speed metrics, and categorical traffic status (`CLEAR` / `MODERATE` / `CONGESTED` / `UNKNOWN`).
+   - **Edges = Logical Connectivity / Transitions:** Edges (`connections`) represent topological adjacency or turn transitions between road segments (for GNN spatial message passing and routing), NOT physical road geometry.
+
+2. **Frontend Map Rendering Rules:**
+   - **Primary Traffic Layer (`node.polyline`):** Always render physical road polylines directly from `nodes` and color each segment independently using its own `node.status`. A segment with valid forecast data must immediately render in its status color without waiting for adjacent nodes to report data.
+   - **Node Centroid Markers:** Render compact interactive markers/anchors at `(node.lat, node.lon)` for inspecting node history/details rather than oversized circles covering intersections.
+   - **Connectivity Layer (`edges`):** Treat `edges` as a secondary topological overlay (e.g., subtle dashed connector lines or directional arrows toggleable by the user), NOT as the primary traffic status layer.
+
+3. **Edge Status Fallback & Geometry Resolution:**
+   - When registering agents with `geometry_mode = "auto"` (or when a node lacks a manual `polyline`), resolve the road segment `polyline` via TomTom Flow Segment so `GET /api/traffic/map` always returns renderable polylines for nodes.
+   - For `edges` metadata: if both endpoint nodes have forecasts, compute average speed and minimum confidence; if only one endpoint has a forecast, optionally inherit or mark edge connectivity clearly without blocking the active node's own `polyline` from rendering.

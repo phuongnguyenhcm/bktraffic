@@ -12,12 +12,16 @@ import {
 } from '../common/domain/traffic.models.js';
 import { AbstractEdgeRegistryProvider } from '../providers/edge-registry/edge-registry.provider.abstract.js';
 import { AbstractGeometryProvider } from '../providers/geometry/geometry.provider.abstract.js';
+import { TopologyService } from '../topology/topology.service.js';
+
+const NODE_RESOLUTION_BATCH_SIZE = 20;
 
 @Injectable()
 export class EdgeAgentRegistrationService {
   constructor(
     private readonly registry: AbstractEdgeRegistryProvider,
     private readonly geometry: AbstractGeometryProvider,
+    private readonly topology: TopologyService,
   ) {}
 
   async register(
@@ -90,7 +94,8 @@ export class EdgeAgentRegistrationService {
       return { edge, from, to };
     });
 
-    const edges = await Promise.all(
+    const resolvedNodes = this.resolveNodePolylines([...nodes.values()]);
+    const resolvedEdges = Promise.all(
       connections.map(async ({ edge, from, to }) => ({
         id: edge.id,
         fromNodeId: edge.fromNodeId,
@@ -104,11 +109,25 @@ export class EdgeAgentRegistrationService {
         ),
       })),
     );
+    const [registeredNodes, edges] = await Promise.all([resolvedNodes, resolvedEdges]);
     const topology = {
-      nodes: [...nodes.values()].sort((a, b) => a.index - b.index),
+      nodes: registeredNodes.sort((a, b) => a.index - b.index),
       edges,
     };
     await this.registry.register(agent, topology);
     return topology;
+  }
+
+  private async resolveNodePolylines(nodes: RegisteredNode[]): Promise<RegisteredNode[]> {
+    const resolved: RegisteredNode[] = [];
+    for (let i = 0; i < nodes.length; i += NODE_RESOLUTION_BATCH_SIZE) {
+      const batch = nodes.slice(i, i + NODE_RESOLUTION_BATCH_SIZE);
+      const resolvedBatch = await Promise.all(batch.map(async (node) => ({
+        ...node,
+        polyline: node.polyline ?? await this.topology.resolveNodePolyline(node.lat, node.lon),
+      })));
+      resolved.push(...resolvedBatch);
+    }
+    return resolved;
   }
 }

@@ -83,6 +83,7 @@ export const en = {
     noAgentRoads: "No Edge Agents have registered roads",
     roadsAfterConfig: "Monitoring points will appear after an Edge Agent submits its configuration.",
     map: "Traffic map",
+    showTopologyLinks: "Show topology links",
     noMapData: "No map data is available.",
     detail: "Forecast details",
     waitingForMap: "Forecast details will appear when the map loads.",

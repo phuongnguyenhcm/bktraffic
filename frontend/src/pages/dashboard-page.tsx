@@ -11,6 +11,7 @@ import NodeDetailPanel from '@/components/dashboard/node-detail-panel'
 import HorizonSelector from '@/components/dashboard/horizon-selector'
 import ErrorState from '@/components/common/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 
 const REFRESH_MS = 30_000
 const SUMMARY = { clear: 'CLEAR', moderate: 'MODERATE', congested: 'CONGESTED' } as const
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const { messages, locale } = useLanguage()
   const [horizon, setHorizon] = useState<PredictionHorizon>(10)
   const [selection, setSelection] = useState<string | null>()
+  const [showTopologyLinks, setShowTopologyLinks] = useState(false)
   const map = useAsync((signal) => fetchTrafficMap(horizon, signal), horizon, REFRESH_MS)
 
   const current = map.data?.horizonMinutes === horizon ? map.data : null
@@ -103,11 +105,15 @@ export default function DashboardPage() {
                     </div>
                   ))}
                 </dl>
+                <label className="flex cursor-pointer items-center gap-2 text-xs text-foreground">
+                  <Switch size="sm" checked={showTopologyLinks} onCheckedChange={setShowTopologyLinks} />
+                  {messages.traffic.showTopologyLinks}
+                </label>
               </div>
               <div className="relative isolate h-[clamp(340px,54vh,620px)]">
                 {map.data && (
                   <div className={current ? 'size-full' : 'invisible size-full'} aria-hidden={!current}>
-                    <TrafficMap nodes={map.data.nodes} edges={map.data.edges} selectedId={selectedId} focusId={selection ?? undefined} onSelect={setSelection} />
+                    <TrafficMap nodes={map.data.nodes} edges={map.data.edges} showTopologyLinks={showTopologyLinks} selectedId={selectedId} focusId={selection ?? undefined} onSelect={setSelection} />
                   </div>
                 )}
                 {!current && (

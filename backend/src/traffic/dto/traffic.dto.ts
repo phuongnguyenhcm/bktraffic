@@ -37,8 +37,11 @@ export class HistoryQueryDto {
 
 export interface MapNodeDto extends InternalNode {
   localId: string;
+  polyline: LatLon[];
   currentSpeedRatio: number;
   currentSpeedKmh: number;
+  predictedSpeed: number; // km/h
+  speedRatio: number; // predicted speed relative to the speed limit
   predictedSpeedRatio: number;
   predictedSpeedKmh: number;
   confidence: number;

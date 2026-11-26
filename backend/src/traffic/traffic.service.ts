@@ -90,12 +90,16 @@ export class TrafficService {
   private toNodeDto(node: RegisteredNode, p: NodePrediction | undefined): MapNodeDto {
     const current = p?.currentSpeedRatio ?? 0;
     const predicted = p?.predictedSpeedRatio ?? 0;
+    const predictedSpeedKmh = p?.predictedSpeedKmh ?? round(predicted * node.speedLimitKmh, 1);
     return {
       ...node,
+      polyline: node.polyline?.length ? node.polyline : [[node.lat, node.lon]],
       currentSpeedRatio: current,
       currentSpeedKmh: round(current * node.speedLimitKmh, 1),
+      predictedSpeed: predictedSpeedKmh,
+      speedRatio: predicted,
       predictedSpeedRatio: predicted,
-      predictedSpeedKmh: p?.predictedSpeedKmh ?? round(predicted * node.speedLimitKmh, 1),
+      predictedSpeedKmh,
       confidence: p?.confidence ?? 0,
       status: p?.status ?? 'UNKNOWN',
       timestamp: p?.timestamp ?? new Date().toISOString(),
@@ -106,8 +110,7 @@ export class TrafficService {
   }
 
   /**
-   * Chỉ số của một cạnh = trung bình hai node đầu mút (đại diện cho đoạn đường giữa 2 điểm đo);
-   * độ tin cậy lấy giá trị nhỏ nhất (thận trọng).
+   * Chỉ số liên kết đồ thị lấy trung bình dự báo hai đầu mút và độ tin cậy thấp nhất.
    */
   private toEdgeDto(
     edge: ResolvedEdge,

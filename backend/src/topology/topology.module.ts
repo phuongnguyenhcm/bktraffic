@@ -18,5 +18,5 @@ class TopologyController {
   }
 }
 
-@Module({ controllers: [TopologyController], providers: [TopologyService] })
+@Module({ controllers: [TopologyController], providers: [TopologyService], exports: [TopologyService] })
 export class TopologyModule {}

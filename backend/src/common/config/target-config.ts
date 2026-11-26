@@ -1,4 +1,4 @@
-import { LOCAL_IDENTIFIER_PATTERN, type LatLon } from '../domain/traffic.models.js';
+import { LOCAL_IDENTIFIER_PATTERN, type GeometryMode, type LatLon } from '../domain/traffic.models.js';
 
 /**
  * Định dạng file cấu hình `target.json` do Edge User cung cấp.
@@ -11,6 +11,7 @@ export interface TargetConfigNode {
   name?: string;
   index?: number;
   speed_limit?: number;
+  geometry_mode?: GeometryMode;
   polyline?: LatLon[];
 }
 
@@ -18,7 +19,7 @@ export interface TargetConfigConnection {
   from: string;
   to: string;
   is_one_way: boolean;
-  geometry_mode?: 'auto' | 'manual';
+  geometry_mode?: GeometryMode;
   polyline?: LatLon[];
 }
 
@@ -89,9 +90,13 @@ export function parseTargetConfig(raw: unknown): ParseResult {
     } else if (speed !== undefined) {
       warnings.push(`Node "${id}" has an invalid speed_limit`);
     }
+    const mode = value['geometry_mode'];
+    if (mode === 'auto' || mode === 'manual') node.geometry_mode = mode;
+    else if (mode !== undefined) warnings.push(`Node "${id}" has an invalid geometry_mode`);
     const polyline = value['polyline'];
     if (isLatLonArray(polyline) && polyline.length >= 2) node.polyline = polyline;
     else if (polyline !== undefined) warnings.push(`Node "${id}" has an invalid polyline`);
+    else if (mode === 'manual') warnings.push(`Node "${id}" requires a manual polyline`);
     nodes.set(id, node);
   }
 

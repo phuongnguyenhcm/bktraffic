@@ -81,6 +81,7 @@ export const vi = {
     noAgentRoads: "Chưa có Edge Agent nào đăng ký cung đường",
     roadsAfterConfig: "Các điểm đo sẽ xuất hiện khi Edge Agent gửi cấu hình.",
     map: "Bản đồ giao thông",
+    showTopologyLinks: "Hiển thị liên kết đồ thị",
     noMapData: "Không có dữ liệu bản đồ.",
     detail: "Chi tiết dự báo",
     waitingForMap: "Chi tiết dự báo sẽ xuất hiện khi tải được bản đồ.",

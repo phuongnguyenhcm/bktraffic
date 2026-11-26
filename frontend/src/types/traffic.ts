@@ -33,8 +33,11 @@ export interface NodePrediction {
 
 export interface MapNode extends InternalNode {
   localId: string
+  polyline: LatLon[]
   currentSpeedRatio: number
   currentSpeedKmh: number
+  predictedSpeed: number
+  speedRatio: number
   predictedSpeedRatio: number
   predictedSpeedKmh: number
   confidence: number
@@ -137,7 +140,7 @@ export interface GenerateConfigRequest {
 
 /** Cấu hình cung đường theo hợp đồng Backend API. */
 export interface TargetConfigFile {
-  nodes: Record<string, { lat: number; lon: number; speed_limit?: number; name?: string; polyline?: LatLon[] }>
+  nodes: Record<string, { lat: number; lon: number; speed_limit?: number; name?: string; geometry_mode?: GeometryMode; polyline?: LatLon[] }>
   connections: {
     from: string
     to: string

@@ -11,6 +11,7 @@ import { TrafficForecast } from '../src/database/schemas/traffic-forecast.schema
 import { NodePredictionLatest } from '../src/database/schemas/node-prediction-latest.schema.js';
 import { ForecastBucketingService } from '../src/providers/prediction/forecast-bucketing.service.js';
 import { EdgeAgent } from '../src/database/schemas/edge-agent.schema.js';
+import { PolylineCache } from '../src/database/schemas/polyline-cache.schema.js';
 import { AbstractPredictionWriter } from '../src/providers/prediction/prediction-writer.abstract.js';
 
 /** Stub geometry — chứng minh khả năng hoán đổi provider qua DI và tránh gọi mạng trong test */
@@ -101,9 +102,15 @@ describe('Traffic API (e2e)', () => {
 
   beforeAll(async () => {
     vi.stubEnv('MONGODB_URI', 'mongodb://127.0.0.1:27017/traffic_db');
+    vi.stubEnv('OSRM_BASE_URL', 'http://osrm.test');
+    vi.stubEnv('TOMTOM_API_KEY', 'your_tomtom_api_key');
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(getConnectionToken()).useValue({ close: () => Promise.resolve() })
       .overrideProvider(getModelToken(EdgeAgent.name)).useValue(agentModel)
+      .overrideProvider(getModelToken(PolylineCache.name)).useValue({
+        init: vi.fn().mockResolvedValue(undefined),
+        findOne: vi.fn(() => ({ lean: () => ({ exec: async () => null }) })),
+      })
       .overrideProvider(getModelToken(TrafficForecast.name)).useValue({ aggregate })
       .overrideProvider(getModelToken(NodePredictionLatest.name)).useValue({})
       .overrideProvider(getModelToken(NodePredictionHistory.name)).useValue(history)

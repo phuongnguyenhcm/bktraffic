@@ -82,7 +82,7 @@ export function fetchTrafficMap(horizon: PredictionHorizon, signal?: AbortSignal
 }
 
 export function fetchNodeHistory(nodeId: string, signal?: AbortSignal) {
-  return request<NodeHistoryResponse>(`/traffic/nodes/${encodeURIComponent(nodeId)}/history`, { signal })
+  return request<NodeHistoryResponse>(`/traffic/nodes/${encodeURIComponent(nodeId)}`, { signal })
 }
 
 export function fetchEdgeNodes(signal?: AbortSignal) {

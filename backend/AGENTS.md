@@ -3,7 +3,7 @@
 ## Project Overview — BKTraffic
 
 **BKTraffic** is a Traffic Forecasting & Edge Management web application.
-- **Backend:** NestJS (ESM, Vitest, MongoDB Atlas via `@nestjs/mongoose`). In production, NestJS serves the pre-compiled React static assets (`frontend/dist`).
+- **Backend:** NestJS (ESM, Vitest, MongoDB via `@nestjs/mongoose`). In production, NestJS serves the pre-compiled React static assets (`frontend/dist`).
 - **Frontend:** React + Vite + Tailwind CSS + `shadcn/ui`.
 - **Environment & Secrets:** NEVER hardcode API keys, database URIs, or credentials in source files. Always isolate them in `.env` (loaded via `@nestjs/config` / `dotenv`) and never commit `.env` to Git.
 
@@ -48,7 +48,7 @@
 
 - **`dev` branch:** Active development containing full `backend/` and `frontend/` source code.
 - **`release/v1.0` branch:** Production release package with NestJS source at the repository root and pre-compiled React static assets in `frontend/dist/`.
-- **Docker:** Use a multi-stage `Dockerfile` (no frontend `node_modules` in the runtime image) orchestrated via `docker-compose.yml` (`bktraffic-app`). Ensure `ServeStaticModule` path matches the container's `/app/frontend/dist/` layout.
+- **Docker:** `compose.yaml` starts `bktraffic-app` after `mongo` is healthy. The app loads `${ENV_FILE:-.env}` and uses `MONGODB_URI=mongodb://mongo:27017/traffic_db`. For a backend running on the host with the default MongoDB port, use `mongodb://localhost:27017/traffic_db`. The `mongo_data` volume stores the database, including the `polyline_caches` collection.
 
 ---
 
