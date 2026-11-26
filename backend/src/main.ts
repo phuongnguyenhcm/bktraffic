@@ -29,7 +29,7 @@ async function bootstrap(): Promise<void> {
   const frontendDist = path.resolve(process.cwd(), '../frontend/dist');
   app.useStaticAssets(frontendDist, { index: false, redirect: false });
   // React Router dùng cùng index.html khi tải trực tiếp mỗi trang.
-  app.getHttpAdapter().getInstance().get(['/', '/dashboard', '/edge-nodes'], (_request, response) => {
+  app.getHttpAdapter().getInstance().get(['/', '/dashboard', '/edge-nodes', '/edge-nodes/setup'], (_request, response) => {
     response.sendFile('index.html', { root: frontendDist, maxAge: 0 });
   });
 

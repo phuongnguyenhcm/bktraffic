@@ -2,8 +2,11 @@ import type {
   EdgeAgent,
   GenerateConfigRequest,
   GenerateConfigResponse,
+  LatLon,
   NodeHistoryResponse,
+  PlaceSuggestion,
   PredictionHorizon,
+  ResolvedSegment,
   TrafficMapResponse,
 } from '@/types/traffic'
 
@@ -65,6 +68,16 @@ export function fetchNodeHistory(nodeId: string, signal?: AbortSignal) {
 
 export function fetchEdgeNodes(signal?: AbortSignal) {
   return request<EdgeAgent[]>('/edge-nodes', { signal })
+}
+
+export function resolveRoadSegment([lat, lon]: LatLon, signal?: AbortSignal) {
+  const query = new URLSearchParams({ lat: String(lat), lon: String(lon) })
+  return request<ResolvedSegment>(`/topology/resolve-segment?${query}`, { signal })
+}
+
+export function searchPlaces(query: string, signal?: AbortSignal) {
+  const params = new URLSearchParams({ q: query })
+  return request<PlaceSuggestion[]>(`/topology/search-place?${params}`, { signal })
 }
 
 export function generateEdgeConfig(body: GenerateConfigRequest, signal?: AbortSignal) {

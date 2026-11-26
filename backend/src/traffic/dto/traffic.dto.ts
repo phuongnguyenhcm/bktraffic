@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 import {
   PREDICTION_HORIZONS,
+  PREDICTION_HISTORY_LIMIT,
   type GeometryMode,
   type InternalNode,
   type LatLon,
@@ -26,13 +27,14 @@ export class HistoryQueryDto {
   @IsInt()
   @Min(1)
   @Max(288)
-  limit = 24;
+  limit = PREDICTION_HISTORY_LIMIT;
 }
 
 // ───────────────────────── Response DTOs ─────────────────────────
 // Chỉ chứa trường canonical — không có FRC / freeFlowSpeed / travelTime.
 
 export interface MapNodeDto extends InternalNode {
+  localId: string;
   currentSpeedRatio: number;
   currentSpeedKmh: number;
   predictedSpeedRatio: number;

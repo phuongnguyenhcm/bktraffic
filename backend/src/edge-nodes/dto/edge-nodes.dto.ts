@@ -18,9 +18,8 @@ import {
   ValidateNested,
   type ValidationOptions,
 } from 'class-validator';
-import type { GeometryMode, LatLon } from '../../common/domain/traffic.models.js';
+import { LOCAL_IDENTIFIER_PATTERN, type EdgeAgentSummary, type GeometryMode, type LatLon } from '../../common/domain/traffic.models.js';
 import { isLatLonArray, type TargetConfigFile } from '../../common/config/target-config.js';
-import type { EdgeAgent } from '../../providers/edge-registry/edge-registry.provider.abstract.js';
 
 /** Kiểm tra mảng `[[lat, lon], ...]` hợp lệ với tối thiểu `min` điểm */
 function IsLatLonPolyline(min: number, options?: ValidationOptions): PropertyDecorator {
@@ -40,11 +39,9 @@ function IsLatLonPolyline(min: number, options?: ValidationOptions): PropertyDec
   };
 }
 
-const NODE_ID_PATTERN = /^[A-Za-z0-9_+\-.]{1,64}$/;
-
 export class ConfigNodeInputDto {
   @IsString()
-  @Matches(NODE_ID_PATTERN, { message: 'id may contain letters, digits, _ + - . (max 64)' })
+  @Matches(LOCAL_IDENTIFIER_PATTERN, { message: 'id may contain letters, digits, _ + - . (max 64)' })
   id: string;
 
   @IsNumber()
@@ -62,15 +59,19 @@ export class ConfigNodeInputDto {
   @Min(5)
   @Max(150)
   speedLimitKmh?: number;
+
+  @ValidateIf((node: ConfigNodeInputDto) => node.polyline !== undefined)
+  @IsLatLonPolyline(2)
+  polyline?: LatLon[];
 }
 
 export class ConfigConnectionInputDto {
   @IsString()
-  @Matches(NODE_ID_PATTERN)
+  @Matches(LOCAL_IDENTIFIER_PATTERN)
   from: string;
 
   @IsString()
-  @Matches(NODE_ID_PATTERN)
+  @Matches(LOCAL_IDENTIFIER_PATTERN)
   to: string;
 
   @IsBoolean()
@@ -112,4 +113,4 @@ export interface GenerateConfigResponseDto {
   stats: { nodeCount: number; connectionCount: number; manualConnectionCount: number };
 }
 
-export type EdgeAgentDto = EdgeAgent;
+export type EdgeAgentDto = EdgeAgentSummary;

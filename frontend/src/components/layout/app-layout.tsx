@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Activity, Cpu, Home, Map, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import ThemeSwitcher from '@/components/theme-switcher'
 import { cn } from '@/lib/utils'
 
 const NAV = [
@@ -17,14 +18,14 @@ export default function AppLayout() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-[1000] border-b border-white/5 bg-ink-950/75 backdrop-blur-xl">
+      <header className="sticky top-0 z-[1000] border-b border-border bg-background/95 backdrop-blur-xl">
         <nav className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
           <Link to="/" id="nav-logo" className="group flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-gradient-to-br from-brand to-clear shadow-[0_0_20px_rgb(34_211_238/0.4)] transition-transform group-hover:rotate-6">
-              <Activity className="size-5 text-ink-950" strokeWidth={2.5} />
+            <span className="grid size-9 place-items-center rounded-xl bg-primary shadow-panel transition-transform group-hover:rotate-6">
+              <Activity className="size-5 text-primary-foreground" strokeWidth={2.5} />
             </span>
-            <span className="text-lg font-bold tracking-tight text-white">
-              bk<span className="text-brand">traffic</span>
+            <span className="text-lg font-bold tracking-tight text-foreground">
+              bk<span className="text-primary">traffic</span>
             </span>
           </Link>
 
@@ -38,7 +39,7 @@ export default function AppLayout() {
                   className={({ isActive }) =>
                     cn(
                       'flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-                      isActive ? 'bg-white/10 text-white' : 'text-muted-foreground hover:bg-white/5 hover:text-white',
+                      isActive ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     )
                   }
                 >
@@ -49,25 +50,25 @@ export default function AppLayout() {
             ))}
           </ul>
 
-          <div className="hidden text-xs text-muted-foreground md:block">
-            LSTM-FedProx
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className="hidden text-xs text-muted-foreground lg:inline">LSTM-FedProx</span>
+            <ThemeSwitcher />
+            <Button
+              id="nav-mobile-toggle"
+              variant="outline"
+              size="icon"
+              className="md:hidden"
+              onClick={() => setOpen((o) => !o)}
+              aria-label={open ? 'Đóng menu' : 'Mở menu'}
+              aria-expanded={open}
+            >
+              {open ? <X /> : <Menu />}
+            </Button>
           </div>
-
-          <Button
-            id="nav-mobile-toggle"
-            variant="outline"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? 'Đóng menu' : 'Mở menu'}
-            aria-expanded={open}
-          >
-            {open ? <X /> : <Menu />}
-          </Button>
         </nav>
 
         {open && (
-          <ul className="space-y-1 border-t border-white/5 px-4 py-3 md:hidden">
+          <ul className="space-y-1 border-t border-border px-4 py-3 md:hidden">
             {NAV.map(({ to, label, icon: Icon, end }) => (
               <li key={to}>
                 <NavLink
@@ -75,7 +76,7 @@ export default function AppLayout() {
                   end={end}
                   onClick={() => setOpen(false)}
                   className={({ isActive }) =>
-                    cn('flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm', isActive ? 'bg-white/10 text-white' : 'text-muted-foreground')
+                    cn('flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm', isActive ? 'bg-accent text-foreground' : 'text-muted-foreground')
                   }
                 >
                   <Icon className="size-4" />
@@ -92,8 +93,8 @@ export default function AppLayout() {
       </main>
 
       {!fullBleed && (
-        <footer className="border-t border-white/5 py-6 text-center text-xs text-muted-foreground">
-          bktraffic · Federated LSTM-FedProx · Node-Agent Architecture · Bản đồ © OpenStreetMap · Routing © OSRM
+        <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
+          bktraffic · Federated LSTM-FedProx · Node-Agent Architecture · Bản đồ © OpenStreetMap và CARTO · Routing © OSRM
         </footer>
       )}
     </div>

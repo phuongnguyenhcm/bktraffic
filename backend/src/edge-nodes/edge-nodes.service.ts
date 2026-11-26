@@ -1,15 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { buildEdgeId, DEFAULT_SPEED_LIMIT_KMH } from '../common/domain/traffic.models.js';
 import type { TargetConfigConnection, TargetConfigNode } from '../common/config/target-config.js';
-import { AbstractEdgeRegistryProvider } from '../providers/edge-registry/edge-registry.provider.abstract.js';
+import { AbstractTopologyProvider } from '../providers/topology/topology.provider.abstract.js';
 import type { EdgeAgentDto, GenerateConfigDto, GenerateConfigResponseDto } from './dto/edge-nodes.dto.js';
 
 @Injectable()
 export class EdgeNodesService {
-  constructor(private readonly registry: AbstractEdgeRegistryProvider) {}
+  constructor(private readonly topology: AbstractTopologyProvider) {}
 
   listAgents(): Promise<EdgeAgentDto[]> {
-    return this.registry.listAgents();
+    return this.topology.getAgents();
   }
 
   /** Sinh nội dung `target.json` chuẩn (cùng cấu trúc với file gốc + trường mở rộng) */
@@ -19,7 +19,12 @@ export class EdgeNodesService {
 
     for (const n of dto.nodes) {
       if (nodes.has(n.id)) errors.push(`Duplicate node id "${n.id}"`);
-      nodes.set(n.id, { lat: n.lat, lon: n.lon, speed_limit: n.speedLimitKmh ?? DEFAULT_SPEED_LIMIT_KMH });
+      nodes.set(n.id, {
+        lat: n.lat,
+        lon: n.lon,
+        speed_limit: n.speedLimitKmh ?? DEFAULT_SPEED_LIMIT_KMH,
+        ...(n.polyline ? { polyline: n.polyline } : {}),
+      });
     }
 
     const connections: TargetConfigConnection[] = [];

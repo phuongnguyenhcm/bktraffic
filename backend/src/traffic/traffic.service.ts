@@ -2,14 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   classifyTrafficStatus,
   PREDICTION_HORIZONS,
-  type InternalEdge,
   type InternalNode,
+  type RegisteredNode,
+  type ResolvedEdge,
   type NodePrediction,
   type PredictionHorizon,
 } from '../common/domain/traffic.models.js';
 import { AbstractTopologyProvider } from '../providers/topology/topology.provider.abstract.js';
 import { AbstractPredictionProvider } from '../providers/prediction/prediction.provider.abstract.js';
-import { AbstractGeometryProvider } from '../providers/geometry/geometry.provider.abstract.js';
 import type {
   MapEdgeDto,
   MapNodeDto,
@@ -25,35 +25,28 @@ export class TrafficService {
   constructor(
     private readonly topology: AbstractTopologyProvider,
     private readonly prediction: AbstractPredictionProvider,
-    private readonly geometry: AbstractGeometryProvider,
   ) {}
 
-  /**
-   * Agents.md §5 — thứ tự thực thi nghiêm ngặt:
-   * (1) validate (DTO) → (2) topology → (3) inference → (4) geometry chỉ khi lắp response.
-   */
   async getMap(horizon: PredictionHorizon): Promise<TrafficMapResponseDto> {
-    // (2) Load topology
-    const [nodes, edges] = await Promise.all([this.topology.getNodes(), this.topology.getEdges()]);
+    const { nodes, edges } = await this.topology.getTopology();
 
     // (3) Run inference — chỉ làm việc trên canonical models
     const predictions = await Promise.all(nodes.map((n) => this.prediction.predictNode(n, horizon)));
     const predById = new Map(predictions.map((p) => [p.nodeId, p]));
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
 
-    // (4) Response boundary — lúc này mới phân giải polyline
-    const edgeDtos = await Promise.all(edges.map((e) => this.toEdgeDto(e, nodeById, predById)));
+    const edgeDtos = edges.map((edge) => this.toEdgeDto(edge, nodeById, predById));
     const nodeDtos = nodes.map((n) => this.toNodeDto(n, predById.get(n.id)));
 
     const summary: MapSummaryDto = { clear: 0, moderate: 0, congested: 0 };
     nodeDtos.forEach((n) => {
       if (n.status === 'CLEAR') summary.clear++;
       else if (n.status === 'MODERATE') summary.moderate++;
-      else summary.congested++;
+      else if (n.status === 'CONGESTED') summary.congested++;
     });
 
     const latest = predictions
-      .filter((p) => p.confidence > 0)
+      .filter((p) => p.status !== 'UNKNOWN')
       .map((p) => Date.parse(p.timestamp) - horizon * 60_000)
       .reduce<number | null>((max, t) => (max === null || t > max ? t : max), null);
 
@@ -80,9 +73,9 @@ export class TrafficService {
 
   // ───────────────────────── mapping ─────────────────────────
 
-  private toNodeDto(node: InternalNode, p: NodePrediction | undefined): MapNodeDto {
-    const current = p?.currentSpeedRatio ?? 1;
-    const predicted = p?.predictedSpeedRatio ?? 1;
+  private toNodeDto(node: RegisteredNode, p: NodePrediction | undefined): MapNodeDto {
+    const current = p?.currentSpeedRatio ?? 0;
+    const predicted = p?.predictedSpeedRatio ?? 0;
     return {
       ...node,
       currentSpeedRatio: current,
@@ -90,7 +83,7 @@ export class TrafficService {
       predictedSpeedRatio: predicted,
       predictedSpeedKmh: p?.predictedSpeedKmh ?? round(predicted * node.speedLimitKmh, 1),
       confidence: p?.confidence ?? 0,
-      status: p?.status ?? classifyTrafficStatus(predicted),
+      status: p?.status ?? 'UNKNOWN',
       timestamp: p?.timestamp ?? new Date().toISOString(),
     };
   }
@@ -99,20 +92,20 @@ export class TrafficService {
    * Chỉ số của một cạnh = trung bình hai node đầu mút (đại diện cho đoạn đường giữa 2 điểm đo);
    * độ tin cậy lấy giá trị nhỏ nhất (thận trọng).
    */
-  private async toEdgeDto(
-    edge: InternalEdge,
+  private toEdgeDto(
+    edge: ResolvedEdge,
     nodeById: Map<string, InternalNode>,
     predById: Map<string, NodePrediction>,
-  ): Promise<MapEdgeDto | null> {
+  ): MapEdgeDto | null {
     const from = nodeById.get(edge.fromNodeId);
     const to = nodeById.get(edge.toNodeId);
     if (!from || !to) return null;
 
     const pf = predById.get(from.id);
     const pt = predById.get(to.id);
-    const ratio = round(((pf?.predictedSpeedRatio ?? 1) + (pt?.predictedSpeedRatio ?? 1)) / 2);
-    const kmh = round(((pf?.predictedSpeedKmh ?? from.speedLimitKmh) + (pt?.predictedSpeedKmh ?? to.speedLimitKmh)) / 2, 1);
-    const polyline = await this.geometry.resolveEdgePolyline(edge, from, to);
+    const hasPrediction = pf && pt && pf.status !== 'UNKNOWN' && pt.status !== 'UNKNOWN';
+    const ratio = hasPrediction ? round((pf.predictedSpeedRatio + pt.predictedSpeedRatio) / 2) : 0;
+    const kmh = hasPrediction ? round((pf.predictedSpeedKmh + pt.predictedSpeedKmh) / 2, 1) : 0;
 
     return {
       id: edge.id,
@@ -120,11 +113,11 @@ export class TrafficService {
       toNodeId: edge.toNodeId,
       isOneWay: edge.isOneWay,
       geometryMode: edge.geometryMode,
-      polyline,
+      polyline: edge.resolvedPolyline,
       predictedSpeedRatio: ratio,
       predictedSpeedKmh: kmh,
-      confidence: Math.min(pf?.confidence ?? 0, pt?.confidence ?? 0),
-      status: classifyTrafficStatus(ratio),
+      confidence: hasPrediction ? Math.min(pf.confidence, pt.confidence) : 0,
+      status: hasPrediction ? classifyTrafficStatus(ratio) : 'UNKNOWN',
     };
   }
 }

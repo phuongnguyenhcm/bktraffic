@@ -12,7 +12,7 @@ export interface NodeHistoryAndForecast {
 
 /**
  * Agents.md §4.A — Tách Backend khỏi engine suy luận ML.
- * Implementation hiện tại: SimulatedCsvPredictionProvider.
+ * Implementation hiện tại: MongoPredictionProvider.
  * Tương lai: FederatedGrpcPredictionProvider / PythonHttpPredictionProvider (đổi `useClass`).
  */
 export abstract class AbstractPredictionProvider {

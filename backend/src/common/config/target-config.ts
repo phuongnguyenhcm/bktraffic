@@ -1,4 +1,4 @@
-import type { LatLon } from '../domain/traffic.models.js';
+import { LOCAL_IDENTIFIER_PATTERN, type LatLon } from '../domain/traffic.models.js';
 
 /**
  * Định dạng file cấu hình `target.json` do Edge User cung cấp.
@@ -11,6 +11,7 @@ export interface TargetConfigNode {
   name?: string;
   index?: number;
   speed_limit?: number;
+  polyline?: LatLon[];
 }
 
 export interface TargetConfigConnection {
@@ -66,16 +67,31 @@ export function parseTargetConfig(raw: unknown): ParseResult {
   if (!isRecord(rawNodes)) throw new Error('target.json: "nodes" must be an object');
 
   for (const [id, value] of Object.entries(rawNodes)) {
-    if (!isRecord(value) || !isFiniteNumber(value['lat']) || !isFiniteNumber(value['lon'])) {
-      warnings.push(`node "${id}" ignored: missing numeric lat/lon`);
+    if (!LOCAL_IDENTIFIER_PATTERN.test(id) || !isRecord(value)) {
+      warnings.push(`Invalid local node ID or node object: "${id}"`);
       continue;
     }
-    const node: TargetConfigNode = { lat: value['lat'], lon: value['lon'] };
-    if (typeof value['name'] === 'string' && value['name'].trim()) node.name = value['name'].trim();
-    if (isFiniteNumber(value['index'])) node.index = value['index'];
-    if (isFiniteNumber(value['speed_limit']) && value['speed_limit'] > 0) {
-      node.speed_limit = value['speed_limit'];
+    const coordinates = [value['lat'], value['lon']];
+    if (!isLatLon(coordinates)) {
+      warnings.push(`Node "${id}" must have valid numeric lat/lon`);
+      continue;
     }
+    const node: TargetConfigNode = { lat: coordinates[0], lon: coordinates[1] };
+    const name = value['name'];
+    if (typeof name === 'string' && name.trim() && name.length <= 120) node.name = name.trim();
+    else if (name !== undefined) warnings.push(`Node "${id}" has an invalid name`);
+    const index = value['index'];
+    if (typeof index === 'number' && Number.isSafeInteger(index) && index >= 0) node.index = index;
+    else if (index !== undefined) warnings.push(`Node "${id}" has an invalid index`);
+    const speed = value['speed_limit'];
+    if (isFiniteNumber(speed) && speed > 0) {
+      node.speed_limit = speed;
+    } else if (speed !== undefined) {
+      warnings.push(`Node "${id}" has an invalid speed_limit`);
+    }
+    const polyline = value['polyline'];
+    if (isLatLonArray(polyline) && polyline.length >= 2) node.polyline = polyline;
+    else if (polyline !== undefined) warnings.push(`Node "${id}" has an invalid polyline`);
     nodes.set(id, node);
   }
 
@@ -83,22 +99,28 @@ export function parseTargetConfig(raw: unknown): ParseResult {
   if (rawConnections !== undefined && !Array.isArray(rawConnections)) {
     throw new Error('target.json: "connections" must be an array');
   }
-  for (const [i, value] of (rawConnections ?? []).entries()) {
-    if (!isRecord(value) || typeof value['from'] !== 'string' || typeof value['to'] !== 'string') {
-      warnings.push(`connection #${i} ignored: missing from/to`);
+  const entries: unknown[] = rawConnections ?? [];
+  for (const [i, value] of entries.entries()) {
+    if (!isRecord(value) || typeof value['from'] !== 'string' || typeof value['to'] !== 'string' ||
+      (value['is_one_way'] !== undefined && typeof value['is_one_way'] !== 'boolean')) {
+      warnings.push(`Connection #${i} must have from and to, with boolean is_one_way when provided`);
       continue;
     }
     const conn: TargetConfigConnection = {
       from: value['from'],
       to: value['to'],
-      is_one_way: value['is_one_way'] === true,
+      is_one_way: value['is_one_way'] ?? false,
     };
     const mode = value['geometry_mode'];
     if (mode === 'auto' || mode === 'manual') conn.geometry_mode = mode;
+    else if (mode !== undefined) warnings.push(`Connection #${i} has an invalid geometry_mode`);
     if (value['polyline'] !== undefined) {
-      if (isLatLonArray(value['polyline'])) conn.polyline = value['polyline'];
+      if (isLatLonArray(value['polyline']) && value['polyline'].length >= 2 && value['polyline'].length <= 2000) {
+        conn.polyline = value['polyline'];
+      }
       else warnings.push(`connection ${conn.from} → ${conn.to}: invalid polyline ignored`);
     }
+    if (mode === 'manual' && !conn.polyline) warnings.push(`Connection #${i} requires a manual polyline`);
     connections.push(conn);
   }
 

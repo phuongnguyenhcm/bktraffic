@@ -1,10 +1,8 @@
-import type { InternalEdge, InternalNode } from '../../common/domain/traffic.models.js';
+import type { EdgeAgentSummary, InternalNode, RegisteredTopology, ResolvedEdge } from '../../common/domain/traffic.models.js';
 
-/**
- * Agents.md §4.C — Nguồn topology (node + edge) của mạng lưới.
- * Có thể thay bằng provider đọc từ DB / FL Server mà không ảnh hưởng tầng service.
- */
 export abstract class AbstractTopologyProvider {
+  abstract getTopology(): Promise<RegisteredTopology>;
   abstract getNodes(): Promise<InternalNode[]>;
-  abstract getEdges(): Promise<InternalEdge[]>;
+  abstract getEdges(): Promise<ResolvedEdge[]>;
+  abstract getAgents(): Promise<EdgeAgentSummary[]>;
 }

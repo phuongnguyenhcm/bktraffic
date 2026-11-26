@@ -7,10 +7,10 @@ export default function StatusBadge({ status }: { status: TrafficStatus }) {
   return (
     <Badge
       variant="outline"
-      className="gap-1.5 font-semibold"
-      style={{ color: m.color, borderColor: `${m.color}55`, background: `${m.color}1a` }}
+      data-traffic-status={status}
+      className="traffic-surface traffic-text gap-1.5 font-semibold"
     >
-      <span className="size-1.5 rounded-full" style={{ background: m.color, boxShadow: `0 0 8px ${m.color}` }} />
+      <span className="traffic-dot size-1.5 rounded-full" aria-hidden />
       {m.shortLabel}
     </Badge>
   )

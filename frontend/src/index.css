@@ -3,7 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --font-heading: var(--font-sans);
@@ -34,8 +34,15 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-clear: var(--traffic-clear-foreground);
+  --color-moderate: var(--traffic-moderate-foreground);
+  --color-congested: var(--traffic-congested-foreground);
+  --color-unknown: var(--traffic-unknown-foreground);
+  --shadow-panel: var(--panel-shadow);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
+  --color-overlay: var(--overlay);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-foreground: var(--foreground);
@@ -49,104 +56,95 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Smart-City palette (trạng thái giao thông theo Agents.md §7) */
 @theme {
-  --color-ink-950: #060a14;
-  --color-ink-900: #0b1220;
-  --color-ink-800: #111a2e;
-  --color-ink-700: #1a2540;
-
-  --color-clear: #10b981;
-  --color-moderate: #f59e0b;
-  --color-congested: #ef4444;
-  --color-brand: #22d3ee;
-  --color-brand-2: #818cf8;
-
-  --animate-float: float 6s ease-in-out infinite;
   --animate-dash: dash 1.6s linear infinite;
-  --animate-fade-up: fade-up 0.6s ease-out both;
 
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
-  }
   @keyframes dash {
     to { stroke-dashoffset: -20; }
-  }
-  @keyframes fade-up {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.75rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f3f6fa;
+  --foreground: #152339;
+  --card: #fff;
+  --card-foreground: var(--foreground);
+  --popover: #fff;
+  --popover-foreground: var(--foreground);
+  --primary: #086c7c;
+  --primary-foreground: #fff;
+  --primary-hover: color-mix(in srgb, var(--primary) 84%, var(--foreground));
+  --secondary: #e8eef5;
+  --secondary-foreground: #263a53;
+  --muted: #edf1f6;
+  --muted-foreground: #4b5c71;
+  --accent: #e0f1f4;
+  --accent-foreground: #13596a;
+  --destructive: #a4262c;
+  --border: #d4dce7;
+  --input: #8495ac;
+  --ring: #168395;
+  --chart-1: #0b7284;
+  --chart-2: #5b4ab0;
+  --chart-3: #10714f;
+  --chart-4: #92530a;
+  --chart-5: #b52b36;
+  --sidebar: #fff;
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --panel-shadow: 0 4px 16px rgb(21 35 57 / 0.07);
+  --overlay: rgb(21 35 57 / 0.42);
+
+  --traffic-clear: #10B981;
+  --traffic-moderate: #F59E0B;
+  --traffic-congested: #EF4444;
+  --traffic-unknown: #9CA3AF;
+  --traffic-clear-foreground: #086344;
+  --traffic-moderate-foreground: #824500;
+  --traffic-congested-foreground: #a3232a;
+  --traffic-unknown-foreground: #4b5565;
 }
 
-/* Dark Smart-City theme (mặc định — <html class="dark">) */
 .dark {
-  --background: #060a14;
-  --foreground: #e2e8f0;
-  --card: rgb(11 18 32 / 0.72);
-  --card-foreground: #e2e8f0;
-  --popover: #0b1220;
-  --popover-foreground: #e2e8f0;
-  --primary: #22d3ee;
-  --primary-foreground: #060a14;
-  --secondary: rgb(255 255 255 / 0.06);
-  --secondary-foreground: #e2e8f0;
-  --muted: rgb(255 255 255 / 0.06);
-  --muted-foreground: #94a3b8;
-  --accent: rgb(255 255 255 / 0.08);
-  --accent-foreground: #f8fafc;
-  --destructive: #ef4444;
-  --border: rgb(255 255 255 / 0.08);
-  --input: rgb(255 255 255 / 0.12);
-  --ring: rgb(34 211 238 / 0.6);
-  --chart-1: #22d3ee;
-  --chart-2: #a78bfa;
-  --chart-3: #10b981;
-  --chart-4: #f59e0b;
-  --chart-5: #ef4444;
-  --sidebar: #0b1220;
-  --sidebar-foreground: #e2e8f0;
-  --sidebar-primary: #22d3ee;
-  --sidebar-primary-foreground: #060a14;
-  --sidebar-accent: rgb(255 255 255 / 0.06);
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: rgb(255 255 255 / 0.08);
-  --sidebar-ring: rgb(34 211 238 / 0.6);
+  color-scheme: dark;
+  --background: #0a101c;
+  --foreground: #eef3fa;
+  --card: #121d2e;
+  --card-foreground: var(--foreground);
+  --popover: #152238;
+  --popover-foreground: var(--foreground);
+  --primary: #67e8f9;
+  --primary-foreground: #081923;
+  --secondary: #1e2b40;
+  --secondary-foreground: #e3ebf6;
+  --muted: #1b273b;
+  --muted-foreground: #acbad0;
+  --accent: #1d3548;
+  --accent-foreground: #d5f5fa;
+  --destructive: #ff9297;
+  --border: #314158;
+  --input: #687b97;
+  --ring: #69dbe9;
+  --chart-1: #57dced;
+  --chart-2: #b7a9ff;
+  --chart-3: #68e2ac;
+  --chart-4: #fbbf65;
+  --chart-5: #ff9297;
+  --sidebar: var(--card);
+  --panel-shadow: 0 6px 20px rgb(3 8 16 / 0.24);
+  --overlay: rgb(3 8 16 / 0.68);
+
+  --traffic-clear-foreground: #70e6b2;
+  --traffic-moderate-foreground: #f7be5c;
+  --traffic-congested-foreground: #ff9297;
+  --traffic-unknown-foreground: #c4cdd9;
 }
 
 @layer base {
@@ -162,34 +160,122 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
-  .dark body {
-    background-image:
-      radial-gradient(1200px 600px at 10% -10%, rgb(34 211 238 / 0.08), transparent 60%),
-      radial-gradient(900px 500px at 100% 0%, rgb(129 140 248 / 0.08), transparent 60%);
-    background-attachment: fixed;
-  }
   ::selection {
-    background: rgb(34 211 238 / 0.3);
+    @apply bg-accent text-accent-foreground;
   }
+}
+
+@layer components {
+  [data-traffic-status="CLEAR"] {
+    --status-color: var(--traffic-clear);
+    --status-foreground: var(--traffic-clear-foreground);
+  }
+  [data-traffic-status="MODERATE"] {
+    --status-color: var(--traffic-moderate);
+    --status-foreground: var(--traffic-moderate-foreground);
+  }
+  [data-traffic-status="CONGESTED"] {
+    --status-color: var(--traffic-congested);
+    --status-foreground: var(--traffic-congested-foreground);
+  }
+  [data-traffic-status="UNKNOWN"] {
+    --status-color: var(--traffic-unknown);
+    --status-foreground: var(--traffic-unknown-foreground);
+  }
+}
+
+@utility traffic-surface {
+  background-color: color-mix(in srgb, var(--status-color) 12%, var(--card));
+  border-color: color-mix(in srgb, var(--status-color) 40%, var(--border));
+}
+
+@utility traffic-text {
+  color: var(--status-foreground);
+}
+
+@utility traffic-dot {
+  background-color: var(--status-color);
 }
 
 @utility glass {
-  @apply rounded-2xl border border-white/8 bg-ink-900/70 shadow-[0_8px_32px_rgb(0_0_0/0.35)] backdrop-blur-xl;
+  @apply rounded-2xl border border-border bg-card text-card-foreground shadow-panel;
 }
+
 @utility eyebrow {
   @apply text-[11px] font-semibold tracking-wider text-muted-foreground uppercase;
 }
+
 @utility glow-btn {
-  @apply bg-gradient-to-r from-brand to-clear font-semibold text-ink-950 shadow-[0_0_24px_rgb(34_211_238/0.35)] transition-all hover:-translate-y-0.5 hover:shadow-[0_0_36px_rgb(34_211_238/0.55)];
+  @apply bg-primary font-semibold text-primary-foreground shadow-panel transition-colors hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
 }
 
-/* Leaflet dark tweaks */
-.leaflet-container { background: #0b1220; font-family: var(--font-sans); }
-.map-dark .leaflet-tile-pane { filter: invert(1) hue-rotate(185deg) brightness(0.85) contrast(0.9) saturate(0.6); }
-.leaflet-tooltip.seg-tip {
-  background: #0b1220; color: #e2e8f0; border: 1px solid rgb(255 255 255 / 0.12);
-  border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.4); padding: 6px 10px;
+@utility preview-grid {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  opacity: 0.4;
 }
-.leaflet-tooltip.seg-tip::before { display: none; }
-.leaflet-control-attribution { background: rgb(11 18 32 / 0.8) !important; color: #64748b !important; }
-.leaflet-control-attribution a { color: #94a3b8 !important; }
+
+.traffic-map,
+.traffic-map .leaflet-control-zoom a,
+.traffic-map .leaflet-control-attribution {
+  background: var(--card);
+  color: var(--foreground);
+}
+
+.traffic-map a {
+  color: var(--primary);
+}
+
+.traffic-map .leaflet-control-zoom {
+  border-color: var(--border);
+}
+
+.traffic-map .leaflet-control-zoom a {
+  border-color: var(--border);
+}
+
+.traffic-map .leaflet-control-zoom a:hover,
+.traffic-map .leaflet-control-zoom a:focus-visible {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.traffic-map .leaflet-control-zoom a.leaflet-disabled {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.traffic-map .leaflet-control-attribution {
+  color: var(--muted-foreground);
+}
+
+.traffic-map.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+.leaflet-tooltip.seg-tip {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--panel-shadow);
+  padding: 6px 10px;
+}
+
+.leaflet-tooltip.seg-tip::before {
+  display: none;
+}
+
+.area-map-pin::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 18px;
+  background: var(--primary);
+  border: 2px solid var(--card);
+  border-radius: 50% 50% 50% 0;
+  box-shadow: var(--panel-shadow);
+  transform: rotate(-45deg);
+}

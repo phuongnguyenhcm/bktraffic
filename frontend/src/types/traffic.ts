@@ -1,7 +1,7 @@
 /** Mirror các Response DTO canonical của Backend (Agents.md §3) — không có trường TomTom */
 
 export type PredictionHorizon = 5 | 10 | 30 | 60
-export type TrafficStatus = 'CLEAR' | 'MODERATE' | 'CONGESTED'
+export type TrafficStatus = 'CLEAR' | 'MODERATE' | 'CONGESTED' | 'UNKNOWN'
 export type GeometryMode = 'auto' | 'manual'
 export type LatLon = [number, number]
 
@@ -14,6 +14,7 @@ export interface InternalNode {
   lat: number
   lon: number
   speedLimitKmh: number
+  polyline?: LatLon[]
 }
 
 export interface NodePrediction {
@@ -28,6 +29,7 @@ export interface NodePrediction {
 }
 
 export interface MapNode extends InternalNode {
+  localId: string
   currentSpeedRatio: number
   currentSpeedKmh: number
   predictedSpeedRatio: number
@@ -73,20 +75,17 @@ export interface NodeHistoryResponse {
 
 // ───────────── Edge nodes ─────────────
 
-export type EdgeAgentStatus = 'ONLINE' | 'TRAINING' | 'IDLE'
+export type EdgeAgentStatus = 'ONLINE' | 'OFFLINE'
 
 export interface EdgeAgent {
   id: string
+  agentId: string
   name: string
   region: string
-  device: string
   status: EdgeAgentStatus
   managedNodeIds: string[]
   managedNodeCount: number
-  currentRound: number
-  totalRounds: number
-  localLoss: number
-  lastHeartbeat: string
+  lastSeenAt: string
 }
 
 export interface ConfigNodeInput {
@@ -94,6 +93,23 @@ export interface ConfigNodeInput {
   lat: number
   lon: number
   speedLimitKmh?: number
+  polyline?: LatLon[]
+}
+
+export interface ResolvedSegment {
+  lat: number
+  lon: number
+  speedLimitKmh: number
+  polyline: LatLon[]
+  frc?: string
+}
+
+export interface PlaceSuggestion {
+  id: string
+  label: string
+  address: string
+  lat: number
+  lon: number
 }
 
 export interface ConfigConnectionInput {
@@ -110,9 +126,9 @@ export interface GenerateConfigRequest {
   connections: ConfigConnectionInput[]
 }
 
-/** Cấu trúc file target.json (snake_case như file gốc + trường mở rộng) */
+/** Cấu hình cung đường theo hợp đồng Backend API. */
 export interface TargetConfigFile {
-  nodes: Record<string, { lat: number; lon: number; speed_limit?: number }>
+  nodes: Record<string, { lat: number; lon: number; speed_limit?: number; name?: string; polyline?: LatLon[] }>
   connections: {
     from: string
     to: string

@@ -6,11 +6,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard-page'))
 const EdgeNodesPage = lazy(() => import('@/pages/edge-nodes-page'))
+const EdgeSetupPage = lazy(() => import('@/pages/edge-setup-page'))
 
 const TITLES: Record<string, string> = {
   '/': 'bktraffic — Dự báo vận tốc giao thông thời gian thực (LSTM-FedProx)',
   '/dashboard': 'Dashboard dự báo giao thông | bktraffic',
-  '/edge-nodes': 'Cổng Edge Node & Cấu hình Agent | bktraffic',
+  '/edge-nodes': 'Mạng lưới Edge Agents | bktraffic',
+  '/edge-nodes/setup': 'Triển khai Edge Node mới | bktraffic',
 }
 
 export default function App() {
@@ -26,6 +28,7 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<Suspense fallback={<PageLoading />}><DashboardPage /></Suspense>} />
         <Route path="/edge-nodes" element={<Suspense fallback={<PageLoading />}><EdgeNodesPage /></Suspense>} />
+        <Route path="/edge-nodes/setup" element={<Suspense fallback={<PageLoading />}><EdgeSetupPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
