@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import type { Model } from 'mongoose';
+import type { Model, PipelineStage } from 'mongoose';
 import {
+  classifyTrafficStatus,
   PREDICTION_HISTORY_LIMIT,
   type InternalNode,
   type NodePrediction,
@@ -11,22 +12,33 @@ import {
   HISTORY_RETENTION_SECONDS,
   NodePredictionHistory,
 } from '../../database/schemas/node-prediction-history.schema.js';
-import {
-  LATEST_PREDICTION_TTL_SECONDS,
-  NodePredictionLatest,
-} from '../../database/schemas/node-prediction-latest.schema.js';
+import { TrafficForecast } from '../../database/schemas/traffic-forecast.schema.js';
+import { ForecastBucketingService } from './forecast-bucketing.service.js';
 import {
   AbstractPredictionProvider,
   type NodeHistoryAndForecast,
 } from './prediction.provider.abstract.js';
 
+interface SpatialPrediction {
+  _id: string;
+  predictedSpeed: number;
+  speedLimitKmh: number;
+  currentSpeedRatio: number | null;
+  confidence: number | null;
+  targetTimestamp: Date;
+  timeBucket: number;
+  latestGeneratedAt: Date;
+  observedAt: Date | null;
+}
+
 @Injectable()
 export class MongoPredictionProvider extends AbstractPredictionProvider {
   constructor(
-    @InjectModel(NodePredictionLatest.name)
-    private readonly latest: Model<NodePredictionLatest>,
+    @InjectModel(TrafficForecast.name)
+    private readonly forecasts: Model<TrafficForecast>,
     @InjectModel(NodePredictionHistory.name)
     private readonly history: Model<NodePredictionHistory>,
+    private readonly buckets: ForecastBucketingService,
   ) {
     super();
   }
@@ -35,7 +47,36 @@ export class MongoPredictionProvider extends AbstractPredictionProvider {
     node: InternalNode,
     horizon: PredictionHorizon,
   ): Promise<NodePrediction> {
-    return this.toPrediction(node, horizon, await this.findLatest(node.id));
+    const [prediction] = await this.predictNodes([node], horizon);
+    return prediction;
+  }
+
+  override async predictNodes(
+    nodes: readonly InternalNode[],
+    horizon: PredictionHorizon,
+    now = new Date(),
+  ): Promise<NodePrediction[]> {
+    if (!nodes.length) return [];
+    const requestedTime = this.buckets.requestedTime(now, horizon);
+    const keyedNodes = nodes.map((node) => ({
+      node,
+      spatialKey: this.buckets.spatialKey(node.id, node.lat, node.lon),
+    }));
+    // A node may have received a fallback-key forecast before it was registered.
+    const keys = [
+      ...new Set(
+        keyedNodes.flatMap(({ node, spatialKey }) => [node.id, spatialKey]),
+      ),
+    ];
+    const matches = await this.findMatches(keys, requestedTime);
+    return keyedNodes.map(({ node, spatialKey }) =>
+      this.toPrediction(
+        node,
+        horizon,
+        requestedTime,
+        matches.get(spatialKey) ?? matches.get(node.id),
+      ),
+    );
   }
 
   async getNodeHistoryAndForecast(
@@ -43,13 +84,19 @@ export class MongoPredictionProvider extends AbstractPredictionProvider {
     horizons: PredictionHorizon[],
     historyLimit = PREDICTION_HISTORY_LIMIT,
   ): Promise<NodeHistoryAndForecast> {
-    const [latest, observations] = await Promise.all([
-      this.findLatest(node.id),
+    const now = new Date();
+    const [forecasts, observations] = await Promise.all([
+      Promise.all(
+        horizons.map(async (horizon) => {
+          const [prediction] = await this.predictNodes([node], horizon, now);
+          return prediction;
+        }),
+      ),
       this.history
         .find({
           nodeId: node.id,
           timestamp: {
-            $gt: new Date(Date.now() - HISTORY_RETENTION_SECONDS * 1000),
+            $gt: new Date(now.getTime() - HISTORY_RETENTION_SECONDS * 1000),
           },
         })
         .sort({ timestamp: -1 })
@@ -64,40 +111,74 @@ export class MongoPredictionProvider extends AbstractPredictionProvider {
         speedRatio,
         speedKmh: speedRatio * node.speedLimitKmh,
       })),
-      forecasts: horizons.map((horizon) =>
-        this.toPrediction(node, horizon, latest),
-      ),
+      forecasts,
     };
   }
 
-  private findLatest(nodeId: string): Promise<NodePredictionLatest | null> {
-    // MongoDB TTL cleanup is asynchronous, so enforce freshness on reads.
-    const cutoff = new Date(Date.now() - LATEST_PREDICTION_TTL_SECONDS * 1000);
-    return this.latest
-      .findOne({ nodeId, updatedAt: { $gt: cutoff } })
-      .lean()
+  private async findMatches(
+    spatialKeys: string[],
+    requestedTime: Date,
+  ): Promise<Map<string, SpatialPrediction>> {
+    const { distance, nearestFirst } = this.buckets.matchRank(requestedTime);
+    const pipeline: PipelineStage[] = [
+      {
+        $match: {
+          spatialKey: { $in: spatialKeys },
+          ...this.buckets.matchWindow(requestedTime),
+        },
+      },
+      { $set: { distance } },
+      { $sort: nearestFirst },
+      {
+        $group: {
+          _id: { spatialKey: '$spatialKey', agentId: '$agentId' },
+          nearest: { $first: '$$ROOT' },
+        },
+      },
+      { $replaceWith: '$nearest' },
+      { $sort: nearestFirst },
+      {
+        $group: {
+          _id: '$spatialKey',
+          predictedSpeed: { $avg: '$predictedSpeed' },
+          speedLimitKmh: { $avg: '$speedLimitKmh' },
+          currentSpeedRatio: { $avg: '$currentSpeedRatio' },
+          confidence: { $avg: '$confidence' },
+          targetTimestamp: { $first: '$targetTimestamp' },
+          timeBucket: { $first: '$timeBucket' },
+          latestGeneratedAt: { $max: '$generatedAt' },
+          observedAt: { $max: '$observedAt' },
+        },
+      },
+    ];
+    const rows = await this.forecasts
+      .aggregate<SpatialPrediction>(pipeline)
       .exec();
+    return new Map(rows.map((row) => [row._id, row]));
   }
 
   private toPrediction(
     node: InternalNode,
     horizon: PredictionHorizon,
-    latest: NodePredictionLatest | null,
+    requestedTime: Date,
+    match?: SpatialPrediction,
   ): NodePrediction {
-    const forecast = latest?.forecasts.find(
-      (item) => item.horizonMinutes === horizon,
-    );
-    const predictedSpeedRatio = forecast?.predictedSpeedRatio ?? 0;
-    const observedAt = latest?.observedAt.getTime() ?? Date.now();
+    const predictedSpeedKmh = match?.predictedSpeed ?? 0;
+    const ratio = match ? predictedSpeedKmh / match.speedLimitKmh : 0;
+    const targetTimestamp = match?.targetTimestamp.toISOString() ?? null;
     return {
       nodeId: node.id,
       horizonMinutes: horizon,
-      currentSpeedRatio: latest?.currentSpeedRatio ?? 0,
-      predictedSpeedRatio,
-      predictedSpeedKmh: predictedSpeedRatio * node.speedLimitKmh,
-      confidence: forecast ? (latest?.confidence ?? 0) : 0,
-      status: forecast?.status ?? 'UNKNOWN',
-      timestamp: new Date(observedAt + horizon * 60_000).toISOString(),
+      currentSpeedRatio: match?.currentSpeedRatio ?? 0,
+      predictedSpeedRatio: Math.min(1, ratio),
+      predictedSpeedKmh,
+      confidence: match?.confidence ?? 0,
+      status: match ? classifyTrafficStatus(ratio) : 'UNKNOWN',
+      timestamp: targetTimestamp ?? requestedTime.toISOString(),
+      targetTimestamp,
+      timeBucket: match?.timeBucket ?? null,
+      latestGeneratedAt: match?.latestGeneratedAt.toISOString() ?? null,
+      observedAt: match?.observedAt?.toISOString() ?? null,
     };
   }
 }

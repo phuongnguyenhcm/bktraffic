@@ -10,6 +10,7 @@ import {
 } from '../common/domain/traffic.models.js';
 import { AbstractTopologyProvider } from '../providers/topology/topology.provider.abstract.js';
 import { AbstractPredictionProvider } from '../providers/prediction/prediction.provider.abstract.js';
+import { ForecastBucketingService } from '../providers/prediction/forecast-bucketing.service.js';
 import type {
   MapEdgeDto,
   MapNodeDto,
@@ -25,13 +26,15 @@ export class TrafficService {
   constructor(
     private readonly topology: AbstractTopologyProvider,
     private readonly prediction: AbstractPredictionProvider,
+    private readonly buckets: ForecastBucketingService,
   ) {}
 
   async getMap(horizon: PredictionHorizon): Promise<TrafficMapResponseDto> {
+    const now = new Date();
     const { nodes, edges } = await this.topology.getTopology();
 
     // (3) Run inference — chỉ làm việc trên canonical models
-    const predictions = await Promise.all(nodes.map((n) => this.prediction.predictNode(n, horizon)));
+    const predictions = await this.prediction.predictNodes(nodes, horizon, now);
     const predById = new Map(predictions.map((p) => [p.nodeId, p]));
     const nodeById = new Map(nodes.map((n) => [n.id, n]));
 
@@ -45,15 +48,26 @@ export class TrafficService {
       else if (n.status === 'CONGESTED') summary.congested++;
     });
 
-    const latest = predictions
-      .filter((p) => p.status !== 'UNKNOWN')
-      .map((p) => Date.parse(p.timestamp) - horizon * 60_000)
-      .reduce<number | null>((max, t) => (max === null || t > max ? t : max), null);
+    const requestedTime = this.buckets.requestedTime(now, horizon);
+    let closest: NodePrediction | undefined;
+    let latestGeneratedAt: string | null = null;
+    let dataTimestamp: string | null = null;
+    for (const prediction of predictions) {
+      const { targetTimestamp, latestGeneratedAt: generatedAt, observedAt } = prediction;
+      if (targetTimestamp && (!closest?.targetTimestamp || this.buckets.compareTargets(
+        requestedTime, new Date(targetTimestamp), new Date(closest.targetTimestamp),
+      ) < 0)) closest = prediction;
+      if (generatedAt && (!latestGeneratedAt || generatedAt > latestGeneratedAt)) latestGeneratedAt = generatedAt;
+      if (observedAt && (!dataTimestamp || observedAt > dataTimestamp)) dataTimestamp = observedAt;
+    }
 
     return {
       horizonMinutes: horizon,
-      generatedAt: new Date().toISOString(),
-      dataTimestamp: latest === null ? null : new Date(latest).toISOString(),
+      generatedAt: now.toISOString(),
+      dataTimestamp,
+      targetTimestamp: closest?.targetTimestamp ?? null,
+      timeBucket: closest?.timeBucket ?? null,
+      latestGeneratedAt,
       nodes: nodeDtos,
       edges: edgeDtos.filter((e): e is MapEdgeDto => e !== null),
       summary,
@@ -85,6 +99,9 @@ export class TrafficService {
       confidence: p?.confidence ?? 0,
       status: p?.status ?? 'UNKNOWN',
       timestamp: p?.timestamp ?? new Date().toISOString(),
+      targetTimestamp: p?.targetTimestamp ?? null,
+      timeBucket: p?.timeBucket ?? null,
+      latestGeneratedAt: p?.latestGeneratedAt ?? null,
     };
   }
 

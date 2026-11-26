@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import {
-  PREDICTION_HORIZONS,
+  MAX_FORECAST_HORIZON_MINUTES,
   PREDICTION_HISTORY_LIMIT,
   type GeometryMode,
   type InternalNode,
@@ -17,7 +17,9 @@ import {
 export class MapQueryDto {
   @IsOptional()
   @Type(() => Number)
-  @IsIn(PREDICTION_HORIZONS, { message: 'horizon must be one of 5, 10, 30, 60' })
+  @IsInt()
+  @Min(0)
+  @Max(MAX_FORECAST_HORIZON_MINUTES)
   horizon: PredictionHorizon = 10;
 }
 
@@ -42,6 +44,9 @@ export interface MapNodeDto extends InternalNode {
   confidence: number;
   status: TrafficStatus;
   timestamp: string;
+  targetTimestamp: string | null;
+  timeBucket: number | null;
+  latestGeneratedAt: string | null;
 }
 
 export interface MapEdgeDto {
@@ -66,6 +71,9 @@ export interface MapSummaryDto {
 export interface TrafficMapResponseDto {
   horizonMinutes: PredictionHorizon;
   generatedAt: string;
+  targetTimestamp: string | null;
+  timeBucket: number | null;
+  latestGeneratedAt: string | null;
   /** Thời điểm mẫu cảm biến mới nhất dùng làm "hiện tại" cho dự báo */
   dataTimestamp: string | null;
   nodes: MapNodeDto[];

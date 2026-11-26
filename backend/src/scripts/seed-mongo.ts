@@ -2,22 +2,19 @@ import { readFile } from 'node:fs/promises';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { getModelToken } from '@nestjs/mongoose';
-import { mongo, type Model } from 'mongoose';
+import type { Model } from 'mongoose';
 import { AppModule } from '../app.module.js';
 import { parseTargetConfig } from '../common/config/target-config.js';
 import { EdgeAgentRegistrationService } from '../edge-agents/edge-agent-registration.service.js';
 import { parseCsv, resolveDataPath } from '../common/data/data-files.js';
 import {
-  classifyTrafficStatus,
   CSV_SEED_AGENT_ID,
   PREDICTION_HISTORY_LIMIT,
   PREDICTION_HORIZONS,
 } from '../common/domain/traffic.models.js';
 import { NodePredictionHistory } from '../database/schemas/node-prediction-history.schema.js';
-import {
-  LATEST_PREDICTION_TTL_SECONDS,
-  NodePredictionLatest,
-} from '../database/schemas/node-prediction-latest.schema.js';
+import { AbstractPredictionWriter } from '../providers/prediction/prediction-writer.abstract.js';
+import { ForecastBucketingService } from '../providers/prediction/forecast-bucketing.service.js';
 import { parseSpeedCsv } from '../providers/prediction/simulated-csv-prediction.provider.js';
 
 async function seed(): Promise<void> {
@@ -78,36 +75,20 @@ async function seed(): Promise<void> {
     const anchor = new Date();
     anchor.setUTCHours(0, 0, 0, 0);
     const offset = anchor.getTime() - latestSource;
-    const latest = app.get<Model<NodePredictionLatest>>(
-      getModelToken(NodePredictionLatest.name),
-    );
+    const predictions = app.get(AbstractPredictionWriter);
+    const buckets = app.get(ForecastBucketingService);
+    const generatedAt = new Date();
     const history = app.get<Model<NodePredictionHistory>>(
       getModelToken(NodePredictionHistory.name),
     );
     let observationCount = 0;
     let seededNodes = 0;
 
-    for (const { id: nodeId, localId } of topology.nodes) {
+    for (const { id: nodeId, localId, speedLimitKmh } of topology.nodes) {
       const index = csvIndices.get(localId) ?? target.nodes[localId].index;
       if (index === undefined) continue;
       const samples = dataset.byIndex.get(index);
       if (!samples?.length) continue;
-
-      const observedAt = new Date(samples[samples.length - 1].t + offset);
-      const cutoff = new Date(
-        Date.now() - LATEST_PREDICTION_TTL_SECONDS * 1000,
-      );
-      if (
-        await latest
-          .exists({
-            nodeId,
-            observedAt: { $gt: observedAt },
-            updatedAt: { $gt: cutoff },
-          })
-          .exec()
-      ) {
-        continue;
-      }
 
       const measurements = [
         ...new Map(samples.map((sample) => [sample.t, sample])).values(),
@@ -145,51 +126,23 @@ async function seed(): Promise<void> {
         (last.timestamp.getTime() - first.timestamp.getTime()) / 60_000,
       );
       const trend = (last.speedRatio - first.speedRatio) / minutes;
-      const forecasts = PREDICTION_HORIZONS.map((horizonMinutes) => {
+      const frames = PREDICTION_HORIZONS.map((horizonMinutes) => {
         const ratio = last.speedRatio + trend * Math.min(horizonMinutes, 15);
-        const predictedSpeedRatio =
-          Math.round(Math.max(0, Math.min(1, ratio)) * 1000) / 1000;
         return {
-          horizonMinutes,
-          predictedSpeedRatio,
-          status: classifyTrafficStatus(predictedSpeedRatio),
+          nodeId,
+          targetTimestamp: buckets.requestedTime(generatedAt, horizonMinutes),
+          predictedSpeed: Math.max(0, Math.min(1, ratio)) * speedLimitKmh,
+          currentSpeedRatio: last.speedRatio,
+          confidence: last.confidence,
+          observedAt: last.timestamp,
         };
       });
-
-      try {
-        const result = await latest
-          .updateOne(
-            {
-              nodeId,
-              $or: [
-                { observedAt: { $lte: observedAt } },
-                { updatedAt: { $lte: cutoff } },
-              ],
-            },
-            {
-              $set: {
-                nodeId,
-                edgeAgentId: CSV_SEED_AGENT_ID,
-                currentSpeedRatio: last.speedRatio,
-                confidence: last.confidence,
-                forecasts,
-                observedAt: last.timestamp,
-                updatedAt: new Date(),
-              },
-            },
-            { upsert: true },
-          )
-          .exec();
-        seededNodes += result.matchedCount + result.upsertedCount;
-      } catch (error) {
-        // A live report arrived during the seed for this node.
-        if (!(error instanceof mongo.MongoServerError) || error.code !== 11000)
-          throw error;
-      }
+      await predictions.store([{ agentId: CSV_SEED_AGENT_ID, generatedAt, frames }]);
+      seededNodes++;
     }
 
     console.log(
-      `MongoDB seed complete for ${CSV_SEED_AGENT_ID}: ${topology.nodes.length} nodes, ${topology.edges.length} edges, ${seededNodes} latest predictions, ${observationCount} new observations.`,
+      `MongoDB seed complete for ${CSV_SEED_AGENT_ID}: ${topology.nodes.length} nodes, ${topology.edges.length} edges, ${seededNodes} nodes with forecasts, ${observationCount} new observations.`,
     );
   } finally {
     await app.close();

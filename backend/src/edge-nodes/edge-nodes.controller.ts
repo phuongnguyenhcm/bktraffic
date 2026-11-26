@@ -30,9 +30,8 @@ export class EdgeNodesController {
   @Post('predictions')
   @HttpCode(204)
   async ingestPredictions(@Body(EdgePredictionPayloadPipe) reports: EdgePredictionReport[]): Promise<void> {
-    for (const report of reports) {
-      await this.predictions.store(report);
-      await this.registry.touch(report.edgeAgentId);
-    }
+    await this.predictions.store(reports);
+    const agents = new Set(reports.map(({ agentId }) => agentId));
+    await Promise.all([...agents].map((agentId) => this.registry.touch(agentId)));
   }
 }

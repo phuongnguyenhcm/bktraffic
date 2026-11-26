@@ -4,13 +4,14 @@
  * KHÔNG đưa các trường đặc thù của TomTom (FRC, freeFlowSpeed, travelTime, ...) vào đây.
  */
 
-export type PredictionHorizon = 5 | 10 | 30 | 60; // minutes
+export type PredictionHorizon = number; // minutes
 export const REPORTED_TRAFFIC_STATUSES = ['CLEAR', 'MODERATE', 'CONGESTED'] as const;
 export type TrafficStatus = (typeof REPORTED_TRAFFIC_STATUSES)[number] | 'UNKNOWN';
 export type GeometryMode = 'auto' | 'manual';
 export type LatLon = [number, number]; // [lat, lon] for Leaflet compatibility
 
 export const PREDICTION_HORIZONS: readonly PredictionHorizon[] = [5, 10, 30, 60];
+export const MAX_FORECAST_HORIZON_MINUTES = 100_000_000_000;
 export const PREDICTION_HISTORY_LIMIT = 30;
 export const CSV_SEED_AGENT_ID = 'agent-q10-bk';
 export const DEFAULT_SPEED_LIMIT_KMH = 40;
@@ -75,6 +76,10 @@ export interface NodePrediction {
   confidence: number; // [0.0, 1.0]
   status: TrafficStatus;
   timestamp: string; // ISO 8601 — thời điểm mà dự báo có hiệu lực (now + horizon)
+  targetTimestamp?: string | null;
+  timeBucket?: number | null;
+  latestGeneratedAt?: string | null;
+  observedAt?: string | null;
 }
 
 export interface SpeedHistoryPoint {
@@ -89,13 +94,26 @@ export interface EdgeForecast {
   status: (typeof REPORTED_TRAFFIC_STATUSES)[number];
 }
 
-export interface EdgePredictionReport {
+interface ForecastFrameMetadata {
   nodeId: string;
-  edgeAgentId: string;
-  currentSpeedRatio: number;
-  confidence: number;
-  forecasts: EdgeForecast[];
-  observedAt: Date;
+  lat?: number;
+  lng?: number;
+  targetTimestamp: Date;
+  speedLimitKmh?: number;
+  currentSpeedRatio?: number;
+  confidence?: number;
+  observedAt?: Date;
+}
+
+export type ForecastFrame = ForecastFrameMetadata & (
+  | { predictedSpeed: number; predictedSpeedRatio?: never } // km/h
+  | { predictedSpeed?: never; predictedSpeedRatio: number } // legacy reports
+);
+
+export interface EdgePredictionReport {
+  agentId: string;
+  generatedAt: Date;
+  frames: ForecastFrame[];
 }
 
 /** Ngưỡng phân loại theo Agents.md §7 */
@@ -105,10 +123,6 @@ export function classifyTrafficStatus(speedRatio: number): EdgeForecast['status'
   if (speedRatio >= STATUS_THRESHOLDS.clear) return 'CLEAR';
   if (speedRatio >= STATUS_THRESHOLDS.moderate) return 'MODERATE';
   return 'CONGESTED';
-}
-
-export function isPredictionHorizon(value: number): value is PredictionHorizon {
-  return (PREDICTION_HORIZONS as readonly number[]).includes(value);
 }
 
 export function buildEdgeId(fromNodeId: string, toNodeId: string): string {

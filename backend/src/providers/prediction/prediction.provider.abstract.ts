@@ -18,6 +18,10 @@ export interface NodeHistoryAndForecast {
 export abstract class AbstractPredictionProvider {
   abstract predictNode(node: InternalNode, horizon: PredictionHorizon): Promise<NodePrediction>;
 
+  predictNodes(nodes: readonly InternalNode[], horizon: PredictionHorizon, _now?: Date): Promise<NodePrediction[]> {
+    return Promise.all(nodes.map((node) => this.predictNode(node, horizon)));
+  }
+
   abstract getNodeHistoryAndForecast(
     node: InternalNode,
     horizons: PredictionHorizon[],

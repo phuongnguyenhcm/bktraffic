@@ -11,7 +11,7 @@ import {
 export class TrafficController {
   constructor(private readonly traffic: TrafficService) {}
 
-  /** GET /api/traffic/map?horizon=5|10|30|60 */
+  /** GET /api/traffic/map?horizon=10 (minutes) */
   @Get('map')
   getMap(@Query() query: MapQueryDto): Promise<TrafficMapResponseDto> {
     return this.traffic.getMap(query.horizon);

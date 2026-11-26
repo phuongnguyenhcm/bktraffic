@@ -7,7 +7,9 @@ import { AppModule } from './../src/app.module.js';
 import { AbstractGeometryProvider } from './../src/providers/geometry/geometry.provider.abstract.js';
 import { PREDICTION_HORIZONS, type EdgePredictionReport, type InternalEdge, type InternalNode, type LatLon } from './../src/common/domain/traffic.models.js';
 import { NodePredictionHistory } from '../src/database/schemas/node-prediction-history.schema.js';
+import { TrafficForecast } from '../src/database/schemas/traffic-forecast.schema.js';
 import { NodePredictionLatest } from '../src/database/schemas/node-prediction-latest.schema.js';
+import { ForecastBucketingService } from '../src/providers/prediction/forecast-bucketing.service.js';
 import { EdgeAgent } from '../src/database/schemas/edge-agent.schema.js';
 import { AbstractPredictionWriter } from '../src/providers/prediction/prediction-writer.abstract.js';
 
@@ -27,7 +29,8 @@ class StraightLineGeometry extends AbstractGeometryProvider {
 
 describe('Traffic API (e2e)', () => {
   let app: INestApplication<App>;
-  const store = vi.fn<(report: EdgePredictionReport) => Promise<void>>(() => Promise.resolve());
+  let spatialKey: string;
+  const store = vi.fn<(reports: readonly EdgePredictionReport[]) => Promise<void>>(() => Promise.resolve());
   const report = {
     nodeId: 'LyThuongKiet+CMT8',
     edgeAgentId: 'test-agent',
@@ -39,7 +42,9 @@ describe('Traffic API (e2e)', () => {
     observedAt: '2026-11-26T06:30:00.000Z',
   };
   const globalNodeId = `${report.edgeAgentId}::${report.nodeId}`;
-  const stored = { ...report, nodeId: globalNodeId, observedAt: new Date(report.observedAt), updatedAt: new Date() };
+  const targetTimestamp = new Date('2026-11-26T06:40:00.000Z');
+  const generatedAt = new Date(report.observedAt);
+  let hasMatches = true;
   const agentPayload = {
     agentId: report.edgeAgentId,
     name: 'Agent thử nghiệm',
@@ -72,13 +77,13 @@ describe('Traffic API (e2e)', () => {
       },
     }),
   };
-  const latest = {
-    findOne: vi.fn(({ nodeId, updatedAt }: { nodeId: string; updatedAt: { $gt: Date } }) => ({
-      lean: () => ({
-        exec: () => Promise.resolve(nodeId === globalNodeId && stored.updatedAt > updatedAt.$gt ? stored : null),
-      }),
-    })),
-  };
+  const aggregate = vi.fn(() => ({
+    exec: () => Promise.resolve(hasMatches ? [{
+      _id: spatialKey, predictedSpeed: 27.2, speedLimitKmh: 40, currentSpeedRatio: 0.72,
+      confidence: 0.95, targetTimestamp, timeBucket: targetTimestamp.getTime(),
+      latestGeneratedAt: generatedAt, observedAt: generatedAt,
+    }] : []),
+  }));
   const history = {
     find: () => ({
       sort: () => ({
@@ -99,13 +104,15 @@ describe('Traffic API (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(getConnectionToken()).useValue({ close: () => Promise.resolve() })
       .overrideProvider(getModelToken(EdgeAgent.name)).useValue(agentModel)
-      .overrideProvider(getModelToken(NodePredictionLatest.name)).useValue(latest)
+      .overrideProvider(getModelToken(TrafficForecast.name)).useValue({ aggregate })
+      .overrideProvider(getModelToken(NodePredictionLatest.name)).useValue({})
       .overrideProvider(getModelToken(NodePredictionHistory.name)).useValue(history)
       .overrideProvider(AbstractPredictionWriter).useValue({ store })
       .overrideProvider(AbstractGeometryProvider)
       .useClass(StraightLineGeometry)
       .compile();
 
+    spatialKey = moduleFixture.get(ForecastBucketingService).spatialKey(globalNodeId, 10.78, 106.65);
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
@@ -127,11 +134,16 @@ describe('Traffic API (e2e)', () => {
       summary: { clear: number; moderate: number; congested: number };
     };
     expect(body.horizonMinutes).toBe(10);
+    expect(body).toMatchObject({
+      targetTimestamp: targetTimestamp.toISOString(),
+      timeBucket: targetTimestamp.getTime(),
+      latestGeneratedAt: generatedAt.toISOString(),
+    });
     expect(body.nodes.length).toBeGreaterThan(0);
     expect(body.edges.length).toBeGreaterThan(0);
     expect(body.edges.every((e) => e.polyline.length >= 2)).toBe(true);
     expect(body.nodes.find((node) => node.id === globalNodeId)).toMatchObject({
-      status: 'MODERATE', predictedSpeedKmh: 0.68 * 40,
+      status: 'MODERATE', predictedSpeedKmh: 27.2,
     });
     expect(body.nodes.find((node) => node.id !== globalNodeId)).toMatchObject({
       status: 'UNKNOWN', predictedSpeedRatio: 0, predictedSpeedKmh: 0, confidence: 0,
@@ -143,16 +155,19 @@ describe('Traffic API (e2e)', () => {
     expect(body.nodes.some((n) => 'frc' in n)).toBe(false);
   });
 
-  it('rejects unsupported horizon', () => request(app.getHttpServer()).get('/api/traffic/map?horizon=15').expect(400));
+  it('accepts an arbitrary whole-minute horizon and rejects negative horizons', async () => {
+    await request(app.getHttpServer()).get('/api/traffic/map?horizon=15').expect(200);
+    await request(app.getHttpServer()).get('/api/traffic/map?horizon=-1').expect(400);
+  });
 
   it('returns an empty map and registry when there are no registered agents', async () => {
     const registered = [...agentDocuments.entries()];
     agentDocuments.clear();
     try {
-      latest.findOne.mockClear();
+      aggregate.mockClear();
       const map = await request(app.getHttpServer()).get('/api/traffic/map?horizon=10').expect(200);
       expect(map.body).toMatchObject({ nodes: [], edges: [], dataTimestamp: null });
-      expect(latest.findOne).not.toHaveBeenCalled();
+      expect(aggregate).not.toHaveBeenCalled();
       await request(app.getHttpServer()).get('/api/edge-nodes').expect(200, []);
     } finally {
       for (const [id, agent] of registered) agentDocuments.set(id, agent);
@@ -181,16 +196,15 @@ describe('Traffic API (e2e)', () => {
     }
   });
 
-  it('treats an expired prediction as unknown even before TTL cleanup removes it', async () => {
-    const original = stored.updatedAt;
-    stored.updatedAt = new Date(Date.now() - 16 * 60_000);
+  it('reports unknown when there are no forecasts in the matched buckets', async () => {
+    hasMatches = false;
     try {
       const res = await request(app.getHttpServer()).get('/api/traffic/map?horizon=10').expect(200);
       const body = res.body as { dataTimestamp: string | null; nodes: { status: string }[] };
       expect(body.dataTimestamp).toBeNull();
       expect(body.nodes.every((node) => node.status === 'UNKNOWN')).toBe(true);
     } finally {
-      stored.updatedAt = original;
+      hasMatches = true;
     }
   });
 
@@ -206,6 +220,7 @@ describe('Traffic API (e2e)', () => {
   });
 
   it('accepts a single transform-validated report and a batch, rejecting invalid batches before writing', async () => {
+    store.mockClear();
     const sendReports = (payload: object) => request(app.getHttpServer()).post('/api/edge-nodes/predictions').send(payload);
     const agent = agentDocuments.get(report.edgeAgentId);
     if (!agent) throw new Error('Expected registered test agent');
@@ -214,8 +229,15 @@ describe('Traffic API (e2e)', () => {
     expect(offline.body).toMatchObject([{ agentId: report.edgeAgentId, status: 'OFFLINE', managedNodeCount: 2 }]);
     await sendReports(report).expect(204);
     await sendReports([{ ...report, nodeId: globalNodeId }, { ...report, nodeId: 'ToHienThanh' }]).expect(204);
-    expect(store).toHaveBeenCalledTimes(3);
-    expect(store).toHaveBeenCalledWith({ ...report, nodeId: globalNodeId, observedAt: new Date(report.observedAt) });
+    expect(store).toHaveBeenCalledTimes(2);
+    expect(store).toHaveBeenCalledWith([{
+      agentId: report.edgeAgentId, generatedAt,
+      frames: report.forecasts.map(({ horizonMinutes, predictedSpeedRatio }) => ({
+        nodeId: globalNodeId, currentSpeedRatio: report.currentSpeedRatio,
+        confidence: report.confidence, observedAt: generatedAt, predictedSpeedRatio,
+        targetTimestamp: new Date(generatedAt.getTime() + horizonMinutes * 60_000),
+      })),
+    }]);
     const online = await request(app.getHttpServer()).get('/api/edge-nodes').expect(200);
     expect(online.body).toMatchObject([{ agentId: report.edgeAgentId, status: 'ONLINE', managedNodeCount: 2 }]);
 
@@ -223,9 +245,25 @@ describe('Traffic API (e2e)', () => {
     await sendReports({ ...report, forecasts: [null, ...report.forecasts.slice(1)] }).expect(400);
     await sendReports({ ...report, observedAt: '2026-11-26T06:30:00' }).expect(400);
     await sendReports({ ...report, nodeId: 'another-agent::ToHienThanh' }).expect(400);
-    expect(store).toHaveBeenCalledTimes(3);
+    expect(store).toHaveBeenCalledTimes(2);
   });
 
+
+  it('accepts a timestamped batch with an irregular forecast cadence', async () => {
+    store.mockClear();
+    const frames = ['2026-11-26T06:34:27.000Z', '2026-11-26T06:41:36.000Z'].map((targetTimestamp) => ({
+      nodeId: report.nodeId, lat: 10.78, lng: 106.65, targetTimestamp, predictedSpeed: 27.2,
+    }));
+    await request(app.getHttpServer()).post('/api/edge-nodes/predictions').send({
+      agentId: report.edgeAgentId, generatedAt: generatedAt.toISOString(), frames,
+    }).expect(204);
+    expect(store).toHaveBeenCalledWith([{
+      agentId: report.edgeAgentId, generatedAt,
+      frames: frames.map((frame) => ({
+        ...frame, nodeId: globalNodeId, targetTimestamp: new Date(frame.targetTimestamp),
+      })),
+    }]);
+  });
 
   it('returns 404 for unknown node', () =>
     request(app.getHttpServer()).get('/api/traffic/nodes/unknown/history').expect(404));

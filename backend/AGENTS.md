@@ -1,5 +1,57 @@
 # AGENTS.md
 
+## Project Overview — BKTraffic
+
+**BKTraffic** is a Traffic Forecasting & Edge Management web application.
+- **Backend:** NestJS (ESM, Vitest, MongoDB Atlas via `@nestjs/mongoose`). In production, NestJS serves the pre-compiled React static assets (`frontend/dist`).
+- **Frontend:** React + Vite + Tailwind CSS + `shadcn/ui`.
+- **Environment & Secrets:** NEVER hardcode API keys, database URIs, or credentials in source files. Always isolate them in `.env` (loaded via `@nestjs/config` / `dotenv`) and never commit `.env` to Git.
+
+---
+
+## Scaffolding & Tooling Rules
+
+- **Official CLIs Only:** Always initialize projects, modules, and UI components using official CLIs (`npx @nestjs/cli`, `npm create vite`, `npx shadcn@latest init`) rather than manual boilerplate scaffolding.
+- **UI Primitives:** Use `shadcn/ui` components (`frontend/src/components/ui/`) for all standard UI elements.
+
+---
+
+## Frontend UI/UX Standards
+
+- **Bilingual Support (VI / EN):** All user-facing strings must be defined in both `frontend/src/i18n/vi.ts` and `frontend/src/i18n/en.ts` and accessed via `useLanguage()`. Do not hardcode display text in components.
+- **Theming:** Support both **Light** and **Dark** themes using semantic CSS tokens (`bg-background`, `text-foreground`, `text-muted-foreground`, `border-border`, etc.).
+- **Layout Consistency:** Maintain consistent outer padding and spacing across all primary pages (`landing-page`, `dashboard-page`, `edge-nodes-page`, `edge-setup-page`).
+
+---
+
+## Traffic Forecast Architecture Rules (Model-Agnostic)
+
+1. **No Hardcoded Model Assumptions:**
+   - NEVER assume a fixed forecast interval (e.g., 5 min) or fixed sequence length (e.g., 12 frames).
+   - Ingestion APIs must accept an arbitrary-length sequence of forecast frames where each frame explicitly carries `targetTimestamp` (ISO-8601 / `Date`) alongside the batch's `generatedAt`.
+
+2. **Spatial & Temporal Bucketing (Decoupled Strategy):**
+   - NEVER embed timestamp matching, bucketing, or coordinate hashing directly inside controllers or raw MongoDB queries.
+   - Isolate all bucketing and time-matching rules in a dedicated, injectable service (e.g., `ForecastTimeMatcherService` / `ForecastBucketingService`) configurable via environment variables:
+     - **Spatial Key (`spatialKey`):** Encode `(lat, lng)` into a **Geohash** string with configurable precision (`FORECAST_GEOHASH_PRECISION`, default `7` or `8`). If a node has no coordinates, fall back to `nodeId`.
+     - **Temporal Bucket (`timeBucket`):** Quantize `targetTimestamp` into discrete time buckets using `FORECAST_TIME_BUCKET_MS` (e.g., `Math.floor(timestampMs / bucketMs) * bucketMs`).
+     - **Query Resolution:** Given a `requestedTime` (e.g., `now + horizon`), the matcher resolves the target `timeBucket` (or window of buckets within `FORECAST_MATCH_WINDOW_MS`).
+
+3. **Duplicate Handling (Write vs. Read):**
+   - **Temporal deduplication (same agent, same location, same time bucket):** Enforce a unique compound index on `{ agentId: 1, spatialKey: 1, timeBucket: 1 }`. On ingestion, use MongoDB `bulkWrite` (`updateOne` + `upsert: true`) and only overwrite if incoming `generatedAt` is newer than or equal to the stored record.
+   - **Spatial aggregation (multiple agents covering the same area):** At query time, filter by the resolved `timeBucket` window, `$group` by `spatialKey`, and compute the **mean** (`$avg`) of numeric predictions (e.g., `predictedSpeed`), then derive the categorical traffic status (`CLEAR` / `MODERATE` / `CONGESTED`) from the averaged value.
+   - **Response Metadata:** Always return the actual matched `targetTimestamp` / `timeBucket` and `latestGeneratedAt` so the frontend can display exact times and detect stale data.
+   
+---
+
+## Git Branching & Docker Release Workflow
+
+- **`dev` branch:** Active development containing full `backend/` and `frontend/` source code.
+- **`release/v1.0` branch:** Production release package with NestJS source at the repository root and pre-compiled React static assets in `frontend/dist/`.
+- **Docker:** Use a multi-stage `Dockerfile` (no frontend `node_modules` in the runtime image) orchestrated via `docker-compose.yml` (`bktraffic-app`). Ensure `ServeStaticModule` path matches the container's `/app/frontend/dist/` layout.
+
+---
+
 ## NestJS
 
 This app's version of NestJS is likely newer than what you know. https://docs.nestjs.com/llms.txt indexes its documentation, with a markdown page per chapter.
@@ -32,8 +84,3 @@ When a task says how to test, follow it. When it says nothing, cover the behavio
 ## Production data: NestJS Observe
 
 This app's production telemetry - traces, errors, logs and metrics - goes to [NestJS Observe](https://observe.nestjs.com). Until `ObserveModule` is registered in `src/app.module.ts`, nothing is sent: `npx @nestjs/observe link` sets it up in one step - it installs `@nestjs/observe`, wires it into the app, and writes the key pair (`OBSERVE_APP_KEY`, `OBSERVE_APP_SECRET`) to `.env`.
-
-When a task depends on how the app behaves in production - an error users hit, a slow endpoint, a failing job, whether a release made things worse - work from that data, not from the code alone:
-
-- The Observe MCP server answers those questions directly: errors with their traces and logs, slow operations, jobs, and what a release changed (`find_regressions`, `diff_release`). It is included on the Pro plan and above. In Claude Code: `claude mcp add observe --transport http https://observe-api.nestjs.com/mcp`, and the client opens a browser to approve. Other clients: https://www.observe.nestjs.com/documentation/mcp
-- Without it, the user can open the request or error in the Observe dashboard and click **Copy agent prompt**, which hands over that page's trace, stack and logs as text.

@@ -25,6 +25,30 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Forecast ingestion
+
+Send a timestamped batch to `POST /api/edge-nodes/predictions`. Frame times can use any cadence. `predictedSpeed` is in km/h.
+
+```json
+{
+  "agentId": "edge-q10",
+  "generatedAt": "2026-11-26T06:30:00Z",
+  "frames": [
+    {
+      "nodeId": "ly-thuong-kiet",
+      "lat": 10.78,
+      "lng": 106.65,
+      "targetTimestamp": "2026-11-26T06:37:25Z",
+      "predictedSpeed": 29.5
+    }
+  ]
+}
+```
+
+Coordinates are optional. The backend uses registered coordinates when available and the agent-scoped node ID otherwise. Frames may also include `speedLimitKmh`, `confidence`, `currentSpeedRatio` and `observedAt`. Older pushes that supply `observedAt` and horizon offsets are converted to timestamped frames at ingestion.
+
+The defaults are an 8-character Geohash, a 60-second bucket and a 60-second match window. Set `FORECAST_GEOHASH_PRECISION`, `FORECAST_TIME_BUCKET_MS` and `FORECAST_MATCH_WINDOW_MS` in the backend environment to change them. `GET /api/traffic/map?horizon=7` queries the buckets that overlap the match window around seven minutes from now. Each agent contributes its closest frame per spatial key to the mean. The response includes `targetTimestamp` and `timeBucket` from the closest contributing frame and `latestGeneratedAt` from the freshest contribution. These fields are `null` when there is no match.
+
 ## Project setup
 
 ```bash
