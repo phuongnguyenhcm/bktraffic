@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "cn"
@@ -45,6 +46,7 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
 }) {
+  const { messages } = useLanguage()
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -70,7 +72,7 @@ function DialogContent({
           >
             <XIcon
             />
-            <span className="sr-only">Đóng</span>
+            <span className="sr-only">{messages.common.close}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>
@@ -96,6 +98,7 @@ function DialogFooter({
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
 }) {
+  const { messages } = useLanguage()
   return (
     <div
       data-slot="dialog-footer"
@@ -108,7 +111,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close render={<Button variant="outline" />}>
-          Đóng
+          {messages.common.close}
         </DialogPrimitive.Close>
       )}
     </div>

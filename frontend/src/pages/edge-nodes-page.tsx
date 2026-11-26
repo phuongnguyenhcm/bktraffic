@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { Link } from 'react-router-dom'
 import { Clock, Cpu, MapPin, MapPinned, Plus, RefreshCw, Server, Wifi, type LucideIcon } from 'lucide-react'
 import { fetchEdgeNodes } from '@/services/api'
@@ -25,6 +26,7 @@ function StatCard({ icon: Icon, label, value, iconClass }: { icon: LucideIcon; l
 }
 
 function AgentCard({ agent }: { agent: EdgeAgent }) {
+  const { messages, locale } = useLanguage()
   const tone = agent.status === 'ONLINE' ? 'CLEAR' : 'UNKNOWN'
   return (
     <Card id={`agent-${agent.id}`} className="glass gap-3 py-5 ring-0 transition-transform hover:-translate-y-0.5">
@@ -41,29 +43,29 @@ function AgentCard({ agent }: { agent: EdgeAgent }) {
           </div>
           <Badge variant="outline" data-traffic-status={tone} className="traffic-surface traffic-text gap-1.5 font-semibold">
             <span className="traffic-dot size-1.5 rounded-full" aria-hidden />
-            {agent.status}
+            {messages.agents[agent.status]}
           </Badge>
         </div>
 
         <dl className="space-y-2 text-sm">
           <div className="flex items-center justify-between gap-2">
             <dt className="flex items-center gap-1.5 text-muted-foreground">
-              <MapPin className="size-3.5" /> Khu vực
+              <MapPin className="size-3.5" /> {messages.agents.region}
             </dt>
             <dd className="truncate text-right text-foreground">{agent.region}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
             <dt className="flex items-center gap-1.5 text-muted-foreground">
-              <MapPinned className="size-3.5" /> Điểm đo quản lý
+              <MapPinned className="size-3.5" /> {messages.agents.managedPoints}
             </dt>
             <dd className="font-semibold text-foreground">{agent.managedNodeCount}</dd>
           </div>
           <div className="flex items-center justify-between gap-2">
             <dt className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="size-3.5" /> Cập nhật cuối
+              <Clock className="size-3.5" /> {messages.agents.lastSeen}
             </dt>
             <dd className="text-right text-foreground">
-              <time dateTime={agent.lastSeenAt} title={formatDateTime(agent.lastSeenAt)}>{timeAgo(agent.lastSeenAt)}</time>
+              <time dateTime={agent.lastSeenAt} title={formatDateTime(agent.lastSeenAt, locale)}>{timeAgo(agent.lastSeenAt, locale)}</time>
             </dd>
           </div>
         </dl>
@@ -73,6 +75,7 @@ function AgentCard({ agent }: { agent: EdgeAgent }) {
 }
 
 export default function EdgeNodesPage() {
+  const { messages, locale } = useLanguage()
   const agents = useAsync(fetchEdgeNodes, 'agents', 10_000)
   const list = agents.data ?? []
   const online = list.filter((agent) => agent.status === 'ONLINE').length
@@ -82,21 +85,21 @@ export default function EdgeNodesPage() {
     <div className="space-y-8 py-10">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Mạng lưới Edge Agents</h1>
-          <p className="mt-2 max-w-2xl text-muted-foreground">Theo dõi kết nối và các điểm đo do từng Edge Agent quản lý.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{messages.agents.network}</h1>
+          <p className="mt-2 max-w-2xl text-muted-foreground">{messages.agents.networkDescription}</p>
         </div>
         <Link to="/edge-nodes/setup" id="cta-deploy-edge" className="glow-btn inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm">
-          <Plus className="size-4" /> Triển khai Edge Node mới
+          <Plus className="size-4" /> {messages.agents.deploy}
         </Link>
       </header>
 
       {(!agents.error || agents.data) && (
-        <section className="grid gap-4 sm:grid-cols-3" aria-label="Thống kê tổng quan">
+        <section className="grid gap-4 sm:grid-cols-3" aria-label={messages.agents.overview}>
           {agents.data ? (
             <>
-              <StatCard icon={Server} label="Tổng số Agent" value={String(list.length)} iconClass="bg-chart-2/10 text-chart-2" />
-              <StatCard icon={Wifi} label="Agent online" value={String(online)} iconClass="bg-clear/10 text-clear" />
-              <StatCard icon={MapPinned} label="Điểm đo đã đăng ký" value={String(totalPoints)} iconClass="bg-accent text-accent-foreground" />
+              <StatCard icon={Server} label={messages.agents.total} value={list.length.toLocaleString(locale)} iconClass="bg-chart-2/10 text-chart-2" />
+              <StatCard icon={Wifi} label={messages.agents.online} value={online.toLocaleString(locale)} iconClass="bg-clear/10 text-clear" />
+              <StatCard icon={MapPinned} label={messages.agents.registeredPoints} value={totalPoints.toLocaleString(locale)} iconClass="bg-accent text-accent-foreground" />
             </>
           ) : (
             Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[86px] rounded-2xl" />)
@@ -107,14 +110,14 @@ export default function EdgeNodesPage() {
       <section aria-labelledby="agents-title">
         <div className="mb-4 flex items-center justify-between">
           <h2 id="agents-title" className="text-xl font-semibold text-foreground">
-            Danh sách Agent
+            {messages.agents.list}
           </h2>
           <Button id="agents-refresh" variant="outline" size="sm" onClick={agents.reload}>
-            <RefreshCw className={agents.loading ? 'animate-spin' : ''} /> Làm mới
+            <RefreshCw className={agents.loading ? 'animate-spin' : ''} /> {messages.common.refresh}
           </Button>
         </div>
         {agents.error && agents.data && (
-          <p role="status" className="mb-3 text-sm text-moderate">Làm mới thất bại. Đang hiển thị danh sách đã tải.</p>
+          <p role="status" className="mb-3 text-sm text-moderate">{messages.agents.refreshError}</p>
         )}
         {agents.error && !agents.data ? (
           <div className="glass">
@@ -123,13 +126,13 @@ export default function EdgeNodesPage() {
         ) : agents.data && list.length === 0 ? (
           <div className="glass flex flex-col items-center gap-3 p-10 text-center">
             <Server className="size-8 text-muted-foreground" />
-            <p className="text-muted-foreground">Chưa có Edge Agent nào tham gia mạng lưới.</p>
+            <p className="text-muted-foreground">{messages.agents.empty}</p>
             <Link to="/edge-nodes/setup" className="text-sm font-semibold text-primary hover:underline">
-              Triển khai Edge Node đầu tiên →
+              {messages.agents.first}
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {agents.data ? list.map((a) => <AgentCard key={a.id} agent={a} />) : Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-60 rounded-2xl" />)}
           </div>
         )}

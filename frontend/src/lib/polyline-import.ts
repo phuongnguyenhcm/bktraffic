@@ -1,5 +1,6 @@
 import { coordinateKey, DEFAULT_SPEED_LIMIT, validCoordinate, type AreaDraft } from '@/lib/edge-setup'
 import type { LatLon } from '@/types/traffic'
+import type { Messages } from '@/i18n/vi'
 
 type Order = 'lat-lon' | 'lon-lat'
 interface RawRoute {
@@ -64,7 +65,7 @@ export function readPolylineFile(raw: unknown): PolylineFile {
   return { routes, unsupported }
 }
 
-export function previewPolylines(file: PolylineFile, swapped: boolean): { routes: PreviewRoute[]; invalid: number } {
+export function previewPolylines(file: PolylineFile, swapped: boolean, formatName: Messages['upload']['route']): { routes: PreviewRoute[]; invalid: number } {
   const routes: PreviewRoute[] = []
   let invalid = file.unsupported
   file.routes.forEach((route, index) => {
@@ -87,12 +88,12 @@ export function previewPolylines(file: PolylineFile, swapped: boolean): { routes
       invalid++
       return
     }
-    routes.push({ positions, name: route.name?.trim().slice(0, 100) || `Cung đường ${index + 1}`, oneWay: route.oneWay ?? false })
+    routes.push({ positions, name: route.name?.trim().slice(0, 100) || formatName(index + 1), oneWay: route.oneWay ?? false })
   })
   return { routes, invalid }
 }
 
-export function polylinesToDraft(routes: PreviewRoute[]): AreaDraft {
+export function polylinesToDraft(routes: PreviewRoute[], names: Pick<Messages['upload'], 'start' | 'end' | 'point'>): AreaDraft {
   const points: AreaDraft['points'] = []
   const links: AreaDraft['links'] = []
   const byCoordinate = new Map<string, number>()
@@ -110,8 +111,8 @@ export function polylinesToDraft(routes: PreviewRoute[]): AreaDraft {
   const pairKey = (a: number, b: number) => a < b ? `${a}:${b}` : `${b}:${a}`
 
   for (const { positions, name, oneWay } of routes) {
-    const from = addPoint(positions[0], `${name} · đầu`)
-    const to = addPoint(positions[positions.length - 1], `${name} · cuối`)
+    const from = addPoint(positions[0], names.start(name))
+    const to = addPoint(positions[positions.length - 1], names.end(name))
     const anchors = [{ index: 0, point: from }]
     if (from === to || pairs.has(pairKey(from, to))) {
       // A closed line needs two intermediate points. A parallel line needs one
@@ -120,7 +121,7 @@ export function polylinesToDraft(routes: PreviewRoute[]): AreaDraft {
       const candidates = positions.slice(1, -1).flatMap((coordinate, index) =>
         byCoordinate.has(coordinateKey(coordinate)) && from !== to ? [] : [{ coordinate, index: index + 1 }])
       for (const candidate of candidates) {
-        const point = addPoint(candidate.coordinate, `${name} · điểm ${anchors.length + 1}`)
+        const point = addPoint(candidate.coordinate, names.point(name, anchors.length + 1))
         if (point === to || anchors.some((anchor) => anchor.point === point)) continue
         anchors.push({ index: candidate.index, point })
         if (anchors.length > needed) break

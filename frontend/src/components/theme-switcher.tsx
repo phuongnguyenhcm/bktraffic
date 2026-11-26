@@ -2,11 +2,13 @@ import { Tooltip } from '@base-ui/react/tooltip'
 import { Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTheme } from '@/hooks/use-theme'
+import { useLanguage } from '@/i18n/use-language'
 
 export default function ThemeSwitcher() {
   const { theme, setTheme } = useTheme()
+  const { messages } = useLanguage()
   const dark = theme === 'dark'
-  const label = dark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'
+  const label = dark ? messages.nav.light : messages.nav.dark
 
   return (
     <Tooltip.Root>

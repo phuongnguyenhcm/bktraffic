@@ -3,22 +3,26 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import AppLayout from '@/components/layout/app-layout'
 import LandingPage from '@/pages/landing-page'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useLanguage } from '@/i18n/use-language'
 
 const DashboardPage = lazy(() => import('@/pages/dashboard-page'))
 const EdgeNodesPage = lazy(() => import('@/pages/edge-nodes-page'))
 const EdgeSetupPage = lazy(() => import('@/pages/edge-setup-page'))
 
-const TITLES: Record<string, string> = {
-  '/': 'bktraffic — Dự báo vận tốc giao thông thời gian thực (LSTM-FedProx)',
-  '/dashboard': 'Dashboard dự báo giao thông | bktraffic',
-  '/edge-nodes': 'Mạng lưới Edge Agents | bktraffic',
-  '/edge-nodes/setup': 'Triển khai Edge Node mới | bktraffic',
-}
+const TITLE_KEYS = new Map<string, 'dashboard' | 'agents' | 'setup'>([
+  ['/dashboard', 'dashboard'],
+  ['/edge-nodes', 'agents'],
+  ['/edge-nodes/setup', 'setup'],
+])
 
 export default function App() {
   const { pathname } = useLocation()
+  const { messages } = useLanguage()
   useEffect(() => {
-    document.title = TITLES[pathname] ?? TITLES['/']
+    document.title = messages.meta[TITLE_KEYS.get(pathname) ?? 'home']
+    document.querySelector('meta[name="description"]')?.setAttribute('content', messages.meta.description)
+  }, [messages, pathname])
+  useEffect(() => {
     window.scrollTo(0, 0)
   }, [pathname])
 
@@ -36,8 +40,9 @@ export default function App() {
 }
 
 function PageLoading() {
+  const { messages } = useLanguage()
   return (
-    <div role="status" aria-label="Đang tải trang" className="mx-auto max-w-[1600px] space-y-4 px-4 py-8">
+    <div role="status" aria-label={messages.common.loadingPage} className="space-y-4 py-8">
       <Skeleton className="h-9 w-60" />
       <Skeleton className="h-[55vh] w-full" />
     </div>

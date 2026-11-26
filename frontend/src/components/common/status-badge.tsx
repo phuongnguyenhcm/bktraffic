@@ -1,9 +1,9 @@
+import { useLanguage } from '@/i18n/use-language'
 import type { TrafficStatus } from '@/types/traffic'
-import { STATUS_META } from '@/lib/traffic'
 import { Badge } from '@/components/ui/badge'
 
 export default function StatusBadge({ status }: { status: TrafficStatus }) {
-  const m = STATUS_META[status]
+  const { messages } = useLanguage()
   return (
     <Badge
       variant="outline"
@@ -11,7 +11,7 @@ export default function StatusBadge({ status }: { status: TrafficStatus }) {
       className="traffic-surface traffic-text gap-1.5 font-semibold"
     >
       <span className="traffic-dot size-1.5 rounded-full" aria-hidden />
-      {m.shortLabel}
+      {messages.traffic[status]}
     </Badge>
   )
 }

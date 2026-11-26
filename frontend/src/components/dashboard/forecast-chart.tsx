@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useId } from 'react'
 import { Area, CartesianGrid, ComposedChart, Legend, Line, ReferenceArea, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { NodeHistoryResponse, PredictionHorizon } from '@/types/traffic'
@@ -17,6 +18,7 @@ interface Props {
 
 /** Lịch sử (nét liền) + dự báo 5p → 10p → 30p → 60p (nét đứt), trục thời gian thực */
 export default function ForecastChart({ data, selectedHorizon }: Props) {
+  const { messages, locale } = useLanguage()
   const historyFill = useId()
   const { history, node } = data
   const forecasts = data.forecasts.filter((forecast) => forecast.status !== 'UNKNOWN')
@@ -49,7 +51,7 @@ export default function ForecastChart({ data, selectedHorizon }: Props) {
           type="number"
           scale="time"
           domain={['dataMin', 'dataMax']}
-          tickFormatter={(v: number) => formatClock(new Date(v).toISOString())}
+          tickFormatter={(v: number) => formatClock(v, locale)}
           tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
           tickLine={false}
           axisLine={false}
@@ -60,20 +62,20 @@ export default function ForecastChart({ data, selectedHorizon }: Props) {
           contentStyle={{ background: 'var(--card)', color: 'var(--foreground)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
           labelStyle={{ color: 'var(--muted-foreground)' }}
           itemStyle={{ color: 'var(--foreground)' }}
-          labelFormatter={(v) => formatClock(new Date(Number(v)).toISOString())}
-          formatter={(v) => `${formatSpeed(Number(v))} km/h`}
+          labelFormatter={(v) => formatClock(Number(v), locale)}
+          formatter={(v) => `${formatSpeed(Number(v), locale)} km/h`}
         />
         <Legend wrapperStyle={{ fontSize: 12, paddingTop: 4 }} iconType="plainline" />
         <ReferenceLine
           y={limit}
           stroke={STATUS_META.CLEAR.color}
           strokeDasharray="2 4"
-          label={{ value: `Giới hạn ${limit}`, fill: 'var(--traffic-clear-foreground)', fontSize: 10, position: 'insideTopRight' }}
+          label={{ value: messages.traffic.limit(limit), fill: 'var(--traffic-clear-foreground)', fontSize: 10, position: 'insideTopRight' }}
         />
-        {last && <ReferenceLine x={last.t} stroke="var(--input)" label={{ value: 'Hiện tại', fill: 'var(--muted-foreground)', fontSize: 10, position: 'top' }} />}
-        <Area name="Lịch sử (cảm biến)" type="monotone" dataKey="history" stroke="var(--chart-1)" strokeWidth={2.5} fill={`url(#${historyFill})`} dot={false} connectNulls={false} isAnimationActive={false} />
+        {last && <ReferenceLine x={last.t} stroke="var(--input)" label={{ value: messages.traffic.current, fill: 'var(--muted-foreground)', fontSize: 10, position: 'top' }} />}
+        <Area name={messages.traffic.history} type="monotone" dataKey="history" stroke="var(--chart-1)" strokeWidth={2.5} fill={`url(#${historyFill})`} dot={false} connectNulls={false} isAnimationActive={false} />
         <Line
-          name="Dự báo"
+          name={messages.traffic.forecast}
           type="monotone"
           dataKey="forecast"
           stroke="var(--chart-2)"
@@ -91,7 +93,7 @@ export default function ForecastChart({ data, selectedHorizon }: Props) {
             fill={STATUS_META[selected.status].color}
             stroke="var(--card)"
             strokeWidth={2}
-            label={{ value: `+${selected.horizonMinutes}p`, fill: 'var(--foreground)', fontSize: 10, position: 'top' }}
+            label={{ value: `+${messages.traffic.minutes(selected.horizonMinutes)}`, fill: 'var(--foreground)', fontSize: 10, position: 'top' }}
           />
         )}
       </ComposedChart>

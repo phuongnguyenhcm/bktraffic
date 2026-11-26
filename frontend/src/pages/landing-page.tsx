@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { Link } from 'react-router-dom'
 import {
   ArrowLeftRight,
@@ -18,13 +19,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { STATUS_META } from '@/lib/traffic'
 
-const STATS = [
-  { icon: Timer, value: '5 · 10 · 30 · 60', unit: 'phút', label: 'Khung dự báo' },
-  { icon: Route, value: 'OSRM', unit: '', label: 'Tự trích xuất hình học đường' },
-  { icon: Network, value: 'Node-Agent', unit: '', label: 'Mỗi điểm đo là một node' },
-]
-
 function HeroVisual() {
+  const { messages } = useLanguage()
   const roads = [
     { d: 'M20 210 C 120 190, 200 200, 300 150 S 460 90, 520 70', c: STATUS_META.CLEAR.color },
     { d: 'M60 40 C 120 100, 180 140, 230 230 S 300 330, 340 340', c: STATUS_META.MODERATE.color },
@@ -40,7 +36,7 @@ function HeroVisual() {
   return (
     <figure className="glass relative overflow-hidden p-4">
       <div className="preview-grid absolute inset-0" />
-      <figcaption className="relative text-xs font-medium text-muted-foreground">Minh họa bản đồ dự báo</figcaption>
+      <figcaption className="relative text-xs font-medium text-muted-foreground">{messages.home.mapPreview}</figcaption>
       <svg viewBox="0 0 550 360" className="relative w-full" aria-hidden>
         {roads.map((r, i) => (
           <g key={i}>
@@ -61,10 +57,10 @@ function HeroVisual() {
           { l: '3 Tháng 2', v: '52%', status: 'MODERATE' },
           { l: 'Tô Hiến Thành', v: '38%', status: 'CONGESTED' },
         ].map((s) => (
-          <div key={s.l} data-traffic-status={s.status} className="rounded-xl border border-border bg-card px-3 py-2">
+          <div key={s.l} data-traffic-status={s.status} className="rounded-xl border border-border bg-card px-1.5 py-2 sm:px-3">
             <p className="truncate text-[11px] text-muted-foreground">{s.l}</p>
-            <p className="traffic-text text-xl font-bold">
-              {s.v} <span className="text-xs font-medium text-muted-foreground">lưu thông</span>
+            <p className="traffic-text text-base font-bold sm:text-xl">
+              {s.v} <span className="text-xs font-medium text-muted-foreground">{messages.traffic.flowShort}</span>
             </p>
           </div>
         ))}
@@ -95,56 +91,61 @@ function Connector({ bidirectional, label }: { bidirectional?: boolean; label: s
   )
 }
 
-const ROLES = [
-  {
-    id: 'role-end-user',
-    icon: Users,
-    iconClass: 'bg-accent text-accent-foreground',
-    title: 'End User',
-    desc: 'Xem bản đồ giao thông, cảnh báo kẹt xe và vận tốc dự báo trên từng tuyến đường cho 5 phút đến 1 giờ tới.',
-    points: ['Bản đồ màu theo mức độ ùn tắc', 'Chọn nhanh khung dự báo 5p / 10p / 30p / 1h', 'Biểu đồ lịch sử & dự báo LSTM-FedProx'],
-    to: '/dashboard',
-    cta: 'Mở Dashboard',
-  },
-  {
-    id: 'role-edge-user',
-    icon: Cpu,
-    iconClass: 'bg-clear/10 text-clear',
-    title: 'Edge User',
-    desc: 'Cấu hình Edge Agent cho mini PC hoặc Raspberry Pi. Khai báo điểm đo, nối các cung đường và tải cấu hình Edge Client.',
-    points: ['Chế độ Auto: chỉ cần lat/lon, hệ thống tự vẽ đường', 'Chế độ Manual: dán polyline tuỳ chỉnh', 'Theo dõi vòng FedProx của mạng lưới'],
-    to: '/edge-nodes',
-    cta: 'Cấu hình Edge Node',
-  },
-]
-
 export default function LandingPage() {
+  const { messages } = useLanguage()
+  const home = messages.home
+  const stats = [
+    { icon: Timer, value: '5 · 10 · 30 · 60', unit: home.minutes, label: home.horizons },
+    { icon: Route, value: 'OSRM', unit: '', label: home.geometry },
+    { icon: Network, value: 'Node-Agent', unit: '', label: home.pointIsNode },
+  ]
+  const roles = [
+    {
+      id: 'role-end-user',
+      icon: Users,
+      iconClass: 'bg-accent text-accent-foreground',
+      title: home.endUser,
+      desc: home.endDesc,
+      points: [home.endMap, home.endHorizons, home.endChart],
+      to: '/dashboard',
+      cta: home.openDashboard,
+    },
+    {
+      id: 'role-edge-user',
+      icon: Cpu,
+      iconClass: 'bg-clear/10 text-clear',
+      title: home.edgeUser,
+      desc: home.edgeDesc,
+      points: [home.edgeAuto, home.edgeManual, home.edgeRounds],
+      to: '/edge-nodes',
+      cta: home.configureEdge,
+    },
+  ]
   return (
     <div className="space-y-24 py-12 sm:py-16">
-      <section className="grid items-center gap-12 lg:grid-cols-2">
+      <section className="grid items-center gap-8 lg:grid-cols-[repeat(2,minmax(0,1fr))] lg:gap-12">
         <div>
           <Badge variant="outline" className="gap-2 border-primary/30 bg-primary/10 px-3 py-1 text-primary">
-            <BrainCircuit className="size-3.5" /> Federated Learning · LSTM-FedProx
+            <BrainCircuit className="size-3.5" /> {home.federated}
           </Badge>
           <h1 className="mt-5 text-4xl leading-[1.1] font-extrabold tracking-tight text-foreground sm:text-5xl xl:text-6xl">
-            Dự báo vận tốc giao thông{' '}
-            <span className="bg-gradient-to-r from-primary via-clear to-chart-2 bg-clip-text text-transparent">thời gian thực</span> tại
-            node biên
+            {home.headingBefore}{' '}
+            <span className="bg-gradient-to-r from-primary via-clear to-chart-2 bg-clip-text text-transparent">{home.headingHighlight}</span>{' '}
+            {home.headingAfter}
           </h1>
           <p className="mt-5 max-w-xl text-lg text-muted-foreground">
-            Trong kiến trúc Node-Agent, mỗi Edge Agent huấn luyện LSTM từ các điểm đo mình quản lý. Máy chủ dùng FedProx
-            để tổng hợp tham số mô hình. Bản demo dự báo dựa trên dữ liệu cảm biến mô phỏng.
+            {home.intro}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link id="hero-cta-dashboard" to="/dashboard" className="glow-btn inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm">
-              Xem bản đồ dự báo <ArrowRight className="size-4" />
+              {messages.home.viewForecast} <ArrowRight className="size-4" />
             </Link>
             <Link
               id="hero-cta-edge"
               to="/edge-nodes"
               className="inline-flex items-center gap-2 rounded-xl border border-border bg-muted px-6 py-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-accent"
             >
-              <Cpu className="size-4" /> Trở thành Edge Node
+              <Cpu className="size-4" /> {messages.home.join}
             </Link>
           </div>
         </div>
@@ -152,7 +153,7 @@ export default function LandingPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-3">
-        {STATS.map(({ icon: Icon, value, unit, label }) => (
+        {stats.map(({ icon: Icon, value, unit, label }) => (
           <div key={label} className="glass p-5">
             <Icon className="size-5 text-primary" />
             <p className="mt-3 text-2xl font-bold text-foreground">
@@ -165,11 +166,11 @@ export default function LandingPage() {
 
       <section>
         <div className="mb-8 text-center">
-          <p className="eyebrow">Hai vai trò người dùng</p>
-          <h2 className="mt-2 text-3xl font-bold text-foreground">Bạn tham gia hệ thống như thế nào?</h2>
+          <p className="eyebrow">{messages.home.roles}</p>
+          <h2 className="mt-2 text-3xl font-bold text-foreground">{messages.home.rolesTitle}</h2>
         </div>
         <div className="grid gap-6 md:grid-cols-2">
-          {ROLES.map((r) => (
+          {roles.map((r) => (
             <Card key={r.id} id={r.id} className="glass group relative overflow-hidden py-7 ring-0">
               <CardContent className="px-7">
                 <div className={`mb-4 grid size-12 place-items-center rounded-2xl ${r.iconClass}`}>
@@ -199,18 +200,18 @@ export default function LandingPage() {
 
       <section>
         <div className="mb-8 text-center">
-          <p className="eyebrow">Kiến trúc Node-Agent</p>
-          <h2 className="mt-2 text-3xl font-bold text-foreground">Luồng hoạt động</h2>
+          <p className="eyebrow">{messages.home.architecture}</p>
+          <h2 className="mt-2 text-3xl font-bold text-foreground">{messages.home.workflow}</h2>
         </div>
         <div className="flex flex-col items-stretch lg:flex-row">
-          <FlowCard icon={MapPinned} iconClass="bg-clear/10 text-clear" title="Edge Agents (Local LSTM)" sub="Thu thập dữ liệu tại các điểm đo đã cấu hình, huấn luyện LSTM cục bộ và gửi trọng số." />
-          <Connector bidirectional label="Trọng số ⇄ Global model" />
-          <FlowCard icon={Server} iconClass="bg-chart-2/10 text-chart-2" title="FL Server (FedProx)" sub="Tổng hợp tham số với số hạng proximal μ, xử lý non-IID giữa khu vực. Backend gắn polyline (OSRM) ở bước cuối." />
+          <FlowCard icon={MapPinned} iconClass="bg-clear/10 text-clear" title={home.localLstm} sub={home.localDesc} />
+          <Connector bidirectional label={home.modelWeights} />
+          <FlowCard icon={Server} iconClass="bg-chart-2/10 text-chart-2" title={home.server} sub={home.serverDesc} />
           <Connector label="REST /traffic/map" />
-          <FlowCard icon={LayoutDashboard} iconClass="bg-accent text-accent-foreground" title="End User Dashboard" sub="Nhận { nodes, edges } sẵn sàng hiển thị: màu ùn tắc, vận tốc dự báo, độ tin cậy." />
+          <FlowCard icon={LayoutDashboard} iconClass="bg-accent text-accent-foreground" title={home.dashboard} sub={home.dashboardDesc} />
         </div>
         <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Gauge className="size-3.5 shrink-0" /> Mức lưu thông = vận tốc dự báo / tốc độ giới hạn · ≥ 75% thông thoáng · từ 45% đến dưới 75% đông đúc · &lt; 45% ùn tắc
+          <Gauge className="size-3.5 shrink-0" /> {home.trafficFormula}
         </div>
       </section>
     </div>

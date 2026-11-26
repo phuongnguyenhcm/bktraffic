@@ -190,9 +190,10 @@ sketch
 .history
 .ionide
 
+# custom by phuong
 Agents.md
-
 tests/
+data/
 
 #!! ERROR: vite is undefined. Use list command to see defined gitignore types !!#
 

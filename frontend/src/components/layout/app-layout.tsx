@@ -3,23 +3,27 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Activity, Cpu, Home, Map, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import ThemeSwitcher from '@/components/theme-switcher'
+import LanguageSwitcher from '@/components/language-switcher'
+import { useLanguage } from '@/i18n/use-language'
 import { cn } from '@/lib/utils'
 
 const NAV = [
-  { to: '/', label: 'Trang chủ', icon: Home, end: true, id: 'nav-home' },
-  { to: '/dashboard', label: 'Dự báo giao thông', icon: Map, end: false, id: 'nav-dashboard' },
-  { to: '/edge-nodes', label: 'Edge Nodes', icon: Cpu, end: false, id: 'nav-edge-nodes' },
-]
+  { to: '/', label: 'home', icon: Home, end: true, id: 'nav-home' },
+  { to: '/dashboard', label: 'traffic', icon: Map, end: false, id: 'nav-dashboard' },
+  { to: '/edge-nodes', label: 'agents', icon: Cpu, end: false, id: 'nav-edge-nodes' },
+] as const
+
+const CONTAINER = 'mx-auto w-full min-w-0 max-w-[1440px] px-4 sm:px-6 lg:px-8'
 
 export default function AppLayout() {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
-  const fullBleed = pathname === '/dashboard'
+  const { messages } = useLanguage()
 
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-[1000] border-b border-border bg-background/95 backdrop-blur-xl">
-        <nav className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4 sm:px-6">
+        <nav className={cn(CONTAINER, 'flex h-16 items-center justify-between')}>
           <Link to="/" id="nav-logo" className="group flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-primary shadow-panel transition-transform group-hover:rotate-6">
               <Activity className="size-5 text-primary-foreground" strokeWidth={2.5} />
@@ -44,7 +48,7 @@ export default function AppLayout() {
                   }
                 >
                   <Icon className="size-4" />
-                  {label}
+                  {messages.nav[label]}
                 </NavLink>
               </li>
             ))}
@@ -53,13 +57,14 @@ export default function AppLayout() {
           <div className="flex items-center gap-2 sm:gap-3">
             <span className="hidden text-xs text-muted-foreground lg:inline">LSTM-FedProx</span>
             <ThemeSwitcher />
+            <LanguageSwitcher />
             <Button
               id="nav-mobile-toggle"
               variant="outline"
               size="icon"
               className="md:hidden"
               onClick={() => setOpen((o) => !o)}
-              aria-label={open ? 'Đóng menu' : 'Mở menu'}
+              aria-label={open ? messages.nav.closeMenu : messages.nav.openMenu}
               aria-expanded={open}
             >
               {open ? <X /> : <Menu />}
@@ -68,7 +73,7 @@ export default function AppLayout() {
         </nav>
 
         {open && (
-          <ul className="space-y-1 border-t border-border px-4 py-3 md:hidden">
+          <ul className={cn(CONTAINER, 'space-y-1 border-t border-border py-3 md:hidden')}>
             {NAV.map(({ to, label, icon: Icon, end }) => (
               <li key={to}>
                 <NavLink
@@ -80,7 +85,7 @@ export default function AppLayout() {
                   }
                 >
                   <Icon className="size-4" />
-                  {label}
+                  {messages.nav[label]}
                 </NavLink>
               </li>
             ))}
@@ -88,13 +93,13 @@ export default function AppLayout() {
         )}
       </header>
 
-      <main className={cn('flex-1', !fullBleed && 'mx-auto w-full max-w-[1600px] px-4 sm:px-6')}>
+      <main className={cn(CONTAINER, 'flex-1')}>
         <Outlet />
       </main>
 
-      {!fullBleed && (
+      {pathname !== '/dashboard' && (
         <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
-          bktraffic · Federated LSTM-FedProx · Node-Agent Architecture · Bản đồ © OpenStreetMap và CARTO · Routing © OSRM
+          <p className={CONTAINER}>{messages.nav.footer}</p>
         </footer>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useState } from 'react'
 import { ArrowRightLeft, FileUp, MapPinPlus, Plus, Route, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,21 +17,19 @@ interface Props {
 const selectClass = 'h-8 w-full min-w-0 rounded-lg border border-input bg-background px-2 text-xs focus-visible:outline-2 focus-visible:outline-ring'
 
 export default function MonitoringAreaEditor({ area, onChange }: Props) {
+  const { messages } = useLanguage()
   const [modal, setModal] = useState<'map' | 'upload' | null>(null)
   const { points, links } = area
   const names = new Map(points.map(({ id, name }) => [id, name]))
   const close = () => setModal(null)
   const apply = (draft: AreaDraft): string | null => {
-    try {
-      const updated = appendArea(area, draft)
-      if (updated.points.length === points.length && updated.links.every((link, index) => link === links[index])) {
-        return 'Các điểm đo và kết nối này đã có trong cấu hình.'
-      }
-      onChange(updated)
-      return null
-    } catch (error) {
-      return error instanceof Error ? error.message : 'Không thể thêm dữ liệu vào cấu hình.'
+    const updated = appendArea(area, draft)
+    if (!updated) return messages.setup.areaLimit
+    if (updated.points.length === points.length && updated.links.every((link, index) => link === links[index])) {
+      return messages.editor.duplicate
     }
+    onChange(updated)
+    return null
   }
   const removePoint = (id: string) => onChange({
     points: points.filter((point) => point.id !== id),
@@ -48,10 +47,10 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
   const actions = (
     <div className="flex flex-wrap gap-2">
       <DialogTrigger render={<Button disabled={points.length >= MAX_POINTS} />} onClick={() => setModal('map')}>
-        <Plus /> Thêm bằng bản đồ (Auto)
+        <Plus /> {messages.editor.auto}
       </DialogTrigger>
       <DialogTrigger render={<Button variant="outline" disabled={points.length >= MAX_POINTS} />} onClick={() => setModal('upload')}>
-        <FileUp /> Tải lên tệp Polyline (Manual)
+        <FileUp /> {messages.editor.manual}
       </DialogTrigger>
     </div>
   )
@@ -62,15 +61,15 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
         ? 'mb-3 flex flex-wrap items-center justify-between gap-3'
         : 'flex flex-col items-start gap-4 rounded-2xl border border-dashed border-border bg-muted/50 p-5 sm:p-8'}>
         {points.length ? (
-          <h3 id="monitoring-points" className="font-semibold text-foreground">Điểm đo ({points.length})</h3>
+          <h3 id="monitoring-points" className="font-semibold text-foreground">{messages.editor.points(points.length)}</h3>
         ) : (
           <>
             <div className="grid size-11 place-items-center rounded-xl bg-accent text-accent-foreground">
               <MapPinPlus className="size-5" aria-hidden />
             </div>
             <div>
-              <h3 className="font-semibold text-foreground">Chưa có điểm đo</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Chọn cung đường trên bản đồ hoặc tải lên tệp polyline có sẵn.</p>
+              <h3 className="font-semibold text-foreground">{messages.editor.empty}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{messages.editor.emptyHint}</p>
             </div>
           </>
         )}
@@ -88,7 +87,7 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
                   </span>
                   <span className="col-start-1 row-start-3 text-xs text-muted-foreground sm:col-auto sm:row-auto">{point.speedLimitKmh} km/h</span>
                   <Button className="col-start-2 row-span-3 row-start-1 sm:col-auto sm:row-auto" variant="ghost" size="icon-sm"
-                    aria-label={`Xóa ${point.name}`} onClick={() => removePoint(point.id)}>
+                    aria-label={messages.editor.removePoint(point.name)} onClick={() => removePoint(point.id)}>
                     <Trash2 />
                   </Button>
                 </li>
@@ -99,21 +98,21 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
           {points.length >= 2 && (
             <section aria-labelledby="monitoring-links" className="space-y-3 border-t border-border pt-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 id="monitoring-links" className="font-semibold text-foreground">Kết nối giữa các node ({links.length})</h3>
-                <Button variant="outline" size="sm" disabled={links.length >= MAX_LINKS} onClick={addLink}><Plus /> Thêm kết nối</Button>
+                <h3 id="monitoring-links" className="font-semibold text-foreground">{messages.editor.connections(links.length)}</h3>
+                <Button variant="outline" size="sm" disabled={links.length >= MAX_LINKS} onClick={addLink}><Plus /> {messages.editor.addConnection}</Button>
               </div>
-              {!links.length && <p className="text-sm text-muted-foreground">Các điểm đo có thể hoạt động độc lập. Thêm kết nối nếu cần theo dõi một cung đường.</p>}
+              {!links.length && <p className="text-sm text-muted-foreground">{messages.editor.optionalConnection}</p>}
               <ul className="max-h-72 space-y-2 overflow-y-auto">
                 {links.map((link, index) => (
                   <li key={link.key} className="rounded-lg border border-border bg-muted/50 px-3 py-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <Badge variant="outline"><Route aria-hidden /> {link.geometryMode === 'manual' ? 'Manual Polyline' : 'Auto'}</Badge>
+                      <Badge variant="outline"><Route aria-hidden /> {link.geometryMode === 'manual' ? messages.editor.manualGeometry : messages.editor.autoGeometry}</Badge>
                       <div className="flex items-center gap-3">
                         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Switch checked={link.isOneWay} size="sm" onCheckedChange={(checked) => updateLink(link.key, { isOneWay: checked })} />
-                          Một chiều
+                          {messages.editor.oneWay}
                         </label>
-                        <Button variant="ghost" size="icon-sm" aria-label={`Xóa kết nối ${index + 1}`}
+                        <Button variant="ghost" size="icon-sm" aria-label={messages.editor.removeConnection(index + 1)}
                           onClick={() => onChange({ points, links: links.filter(({ key }) => key !== link.key) })}>
                           <Trash2 />
                         </Button>
@@ -125,9 +124,9 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
                           {link.geometryMode === 'manual' ? (
                             <span className="wrap-break-word">{names.get(link[side])}</span>
                           ) : (
-                            <select aria-label={`${side === 'from' ? 'Điểm đầu' : 'Điểm cuối'} kết nối ${index + 1}`}
+                            <select aria-label={side === 'from' ? messages.editor.connectionStart(index + 1) : messages.editor.connectionEnd(index + 1)}
                               className={selectClass} value={link[side]} onChange={(event) => updateLink(link.key, { [side]: event.target.value })}>
-                              <option value="">Chọn điểm đo</option>
+                              <option value="">{messages.editor.selectPoint}</option>
                               {points.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
                             </select>
                           )}
@@ -148,9 +147,9 @@ export default function MonitoringAreaEditor({ area, onChange }: Props) {
           ? 'flex h-[92dvh] w-[96vw] max-w-none flex-col overflow-hidden p-5 sm:max-w-none'
           : 'max-h-[92dvh] w-[95vw] max-w-6xl overflow-y-auto sm:max-w-6xl'}>
           <DialogHeader className="pr-9">
-            <DialogTitle>{modal === 'map' ? 'Thêm bằng bản đồ (Auto)' : 'Tải lên tệp Polyline (Manual)'}</DialogTitle>
+            <DialogTitle>{modal === 'map' ? messages.editor.auto : messages.editor.manual}</DialogTitle>
             <DialogDescription>
-              {modal === 'map' ? 'Bấm lên bản đồ để chọn cung đường, rồi đặt tên cho điểm đo.' : 'Kiểm tra các cung đường trên bản đồ trước khi nhập vào cấu hình.'}
+              {modal === 'map' ? messages.editor.autoDescription : messages.editor.manualDescription}
             </DialogDescription>
           </DialogHeader>
           {modal === 'map'

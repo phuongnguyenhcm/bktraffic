@@ -23,7 +23,7 @@ COPY backend/package.json backend/package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=backend-build /app/dist/ ./dist/
 COPY --from=frontend-build /app/dist/ /app/frontend/dist/
-COPY --chown=node:node backend/data/ ./data/
+# COPY --chown=node:node backend/data/ ./data/
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]

@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useEffect, useId, useRef, useState } from 'react'
 import { Loader2, MapPin, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,9 +9,10 @@ import type { PlaceSuggestion } from '@/types/traffic'
 type SearchState =
   | { status: 'idle' | 'loading' }
   | { status: 'success'; results: PlaceSuggestion[] }
-  | { status: 'error'; message: string }
+  | { status: 'error'; error: unknown }
 
 export default function PlaceSearch({ onSelect }: { onSelect: (place: PlaceSuggestion) => void }) {
+  const { messages } = useLanguage()
   const [query, setQuery] = useState('')
   const [state, setState] = useState<SearchState>({ status: 'idle' })
   const [open, setOpen] = useState(false)
@@ -44,7 +46,7 @@ export default function PlaceSearch({ onSelect }: { onSelect: (place: PlaceSugge
         const results = await searchPlaces(keyword, controller.signal)
         if (!controller.signal.aborted) setState({ status: 'success', results })
       } catch (error) {
-        if (!controller.signal.aborted) setState({ status: 'error', message: toErrorMessage(error) })
+        if (!controller.signal.aborted) setState({ status: 'error', error })
       }
     }
     if (debounce) timer.current = window.setTimeout(load, 350)
@@ -63,7 +65,7 @@ export default function PlaceSearch({ onSelect }: { onSelect: (place: PlaceSugge
   return (
     <form
       role="search"
-      aria-label="Tìm đường hoặc địa điểm trên bản đồ"
+      aria-label={messages.picker.searchLabel}
       className="relative z-[1000]"
       onSubmit={(event) => { event.preventDefault(); search(query) }}
       onFocus={() => { if (state.status !== 'idle') setOpen(true) }}
@@ -80,10 +82,10 @@ export default function PlaceSearch({ onSelect }: { onSelect: (place: PlaceSugge
         <Input
           ref={input}
           type="search"
-          aria-label="Tên đường hoặc địa điểm"
+          aria-label={messages.picker.searchName}
           aria-controls={open ? suggestionsId : undefined}
           autoComplete="off"
-          placeholder="Tìm tên đường, ngã tư, khu vực... (vd: Lý Thường Kiệt, Quận 10)"
+          placeholder={messages.picker.searchPlaceholder}
           className="h-10 min-w-0 bg-background"
           value={query}
           onChange={(event) => {
@@ -92,22 +94,22 @@ export default function PlaceSearch({ onSelect }: { onSelect: (place: PlaceSugge
             search(value, true)
           }}
         />
-        <Button type="submit" variant="outline" className="h-10" disabled={!query.trim()} aria-label="Tìm kiếm">
-          <Search aria-hidden /> <span className="hidden sm:inline">Tìm kiếm</span>
+        <Button type="submit" variant="outline" className="h-10" disabled={!query.trim()} aria-label={messages.common.search}>
+          <Search aria-hidden /> <span className="hidden sm:inline">{messages.common.search}</span>
         </Button>
       </div>
       {open && state.status !== 'idle' && (
         <div id={suggestionsId} className="absolute inset-x-0 top-full mt-1 max-h-[50dvh] overflow-y-auto rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-panel">
           {state.status === 'loading' && (
             <p role="status" className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden /> Đang tìm địa điểm…
+              <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden /> {messages.picker.searching}
             </p>
           )}
-          {state.status === 'error' && <p role="alert" className="px-3 py-2 text-sm text-destructive">{state.message}</p>}
+          {state.status === 'error' && <p role="alert" className="px-3 py-2 text-sm text-destructive">{toErrorMessage(state.error, messages.api)}</p>}
           {state.status === 'success' && (state.results.length === 0 ? (
-            <p role="status" className="px-3 py-2 text-sm text-muted-foreground">Không tìm thấy địa điểm phù hợp.</p>
+            <p role="status" className="px-3 py-2 text-sm text-muted-foreground">{messages.picker.noPlaces}</p>
           ) : (
-            <ul aria-label="Địa điểm gợi ý">
+            <ul aria-label={messages.picker.suggestions}>
               {state.results.map((place) => (
                 <li key={place.id}>
                   <button type="button" onMouseDown={(event) => event.preventDefault()}

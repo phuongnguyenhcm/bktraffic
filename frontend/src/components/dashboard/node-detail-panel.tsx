@@ -1,9 +1,10 @@
+import { useLanguage } from '@/i18n/use-language'
 import { lazy, Suspense } from 'react'
 import { AlertOctagon, AlertTriangle, CheckCircle2, CircleHelp, Gauge, MapPin, ShieldCheck, Activity, X, type LucideIcon } from 'lucide-react'
 import type { MapNode, PredictionHorizon, TrafficStatus } from '@/types/traffic'
 import { fetchNodeHistory } from '@/services/api'
 import { useAsync } from '@/hooks/use-async'
-import { HORIZON_LABEL, STATUS_META, formatSpeed, formatClock, pct, statusFromRatio } from '@/lib/traffic'
+import { formatSpeed, formatClock, pct, statusFromRatio } from '@/lib/traffic'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
@@ -40,8 +41,16 @@ interface Props {
 }
 
 export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
+  const { messages, locale } = useLanguage()
   const history = useAsync((signal) => fetchNodeHistory(node.id, signal), node.id, REFRESH_MS)
-  const meta = STATUS_META[node.status]
+  const status = messages.traffic[node.status]
+  const description = {
+    CLEAR: messages.traffic.clearDescription,
+    MODERATE: messages.traffic.moderateDescription,
+    CONGESTED: messages.traffic.congestedDescription,
+    UNKNOWN: messages.traffic.unknownDescription,
+  }[node.status]
+  const duration = messages.traffic.minutes(horizon)
   const hasPrediction = node.status !== 'UNKNOWN'
   const BannerIcon = BANNER_ICON[node.status]
   const currentStatus = statusFromRatio(node.currentSpeedRatio)
@@ -54,14 +63,14 @@ export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={node.status} />
-            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground">node #{node.index}</span>
+            <span className="rounded-md border border-border bg-muted px-2 py-0.5 font-mono text-[11px] text-foreground">{messages.traffic.node(node.index)}</span>
           </div>
           <h2 className="mt-2 text-xl leading-tight font-bold text-foreground">{node.name}</h2>
           <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-            <MapPin className="size-3" /> {node.lat.toFixed(5)}, {node.lon.toFixed(5)} · giới hạn {node.speedLimitKmh} km/h
+            <MapPin className="size-3" /> {node.lat.toFixed(5)}, {node.lon.toFixed(5)} · {messages.traffic.limit(node.speedLimitKmh)} km/h
           </p>
         </div>
-        <Button id="panel-close" variant="outline" size="icon" onClick={onClose} aria-label="Đóng">
+        <Button id="panel-close" variant="outline" size="icon" onClick={onClose} aria-label={messages.common.close}>
           <X />
         </Button>
       </div>
@@ -75,12 +84,12 @@ export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
         <BannerIcon className="traffic-text mt-0.5 size-6 shrink-0" />
         <div>
           <p className="traffic-text font-semibold">
-            {meta.label}{hasPrediction && ` trong ${HORIZON_LABEL[horizon]} tới`}
+            {hasPrediction ? messages.traffic.forecastStatus(status, duration) : status}
           </p>
-          <p className="mt-0.5 text-sm text-foreground">{meta.description}</p>
+          <p className="mt-0.5 text-sm text-foreground">{description}</p>
           {hasPrediction && <p className="mt-1 text-xs text-muted-foreground">
-            Hiện tại: <span data-traffic-status={currentStatus} className="traffic-text">{STATUS_META[currentStatus].shortLabel} ({pct(node.currentSpeedRatio)})</span>
-            {' · '}xu hướng{' '}
+            {messages.traffic.current}: <span data-traffic-status={currentStatus} className="traffic-text">{messages.traffic[currentStatus]} ({pct(node.currentSpeedRatio)})</span>
+            {' · '}{messages.traffic.trend}{' '}
             <span className={delta >= 0 ? 'text-clear' : 'text-congested'}>
               {delta >= 0 ? '▲' : '▼'} {Math.abs(Math.round(delta * 100))}%
             </span>
@@ -88,25 +97,25 @@ export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2.5">
-        <Kpi icon={Activity} label="Mức độ lưu thông" value={hasPrediction ? pct(node.predictedSpeedRatio) : '—'} sub={hasPrediction ? `hiện tại ${pct(node.currentSpeedRatio)}` : '%'} status={node.status} />
-        <Kpi icon={Gauge} label="Vận tốc dự báo" value={hasPrediction ? formatSpeed(node.predictedSpeedKmh) : '—'} sub={hasPrediction ? `km/h · hiện ${formatSpeed(node.currentSpeedKmh)}` : 'km/h'} />
-        <Kpi icon={ShieldCheck} label="Độ tin cậy" value={hasPrediction ? pct(node.confidence) : '—'} sub={`+${HORIZON_LABEL[horizon]}`} status={hasPrediction ? (node.confidence >= 0.75 ? 'CLEAR' : 'MODERATE') : 'UNKNOWN'} />
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        <Kpi icon={Activity} label={messages.traffic.flow} value={hasPrediction ? pct(node.predictedSpeedRatio) : '—'} sub={hasPrediction ? messages.traffic.currentSummary(pct(node.currentSpeedRatio)) : '%'} status={node.status} />
+        <Kpi icon={Gauge} label={messages.traffic.predictedSpeed} value={hasPrediction ? formatSpeed(node.predictedSpeedKmh, locale) : '—'} sub={hasPrediction ? `km/h · ${messages.traffic.currentSummary(formatSpeed(node.currentSpeedKmh, locale))}` : 'km/h'} />
+        <Kpi icon={ShieldCheck} label={messages.traffic.confidence} value={hasPrediction ? pct(node.confidence) : '—'} sub={`+${duration}`} status={hasPrediction ? (node.confidence >= 0.75 ? 'CLEAR' : 'MODERATE') : 'UNKNOWN'} />
       </div>
 
       <Card className="gap-3 bg-muted py-4 ring-border">
         <CardContent className="px-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-foreground">Lịch sử và dự báo vận tốc</h3>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-x-2">
+            <h3 className="text-sm font-semibold text-foreground">{messages.traffic.speedHistory}</h3>
             {lastSample && (
               <p className="text-[11px] text-muted-foreground">
-                Mẫu cuối {formatClock(lastSample.timestamp)}
+                {messages.traffic.lastSample(formatClock(lastSample.timestamp, locale))}
               </p>
             )}
           </div>
           {history.error && history.data && (
             <p role="status" className="mb-2 text-xs text-moderate">
-              Làm mới lịch sử thất bại. <button className="underline" onClick={history.reload}>Thử lại</button>
+              {messages.traffic.historyRefreshError} <button className="underline" onClick={history.reload}>{messages.common.retry}</button>
             </p>
           )}
           <div className="h-64" aria-busy={history.loading}>
@@ -118,7 +127,7 @@ export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
                   <ForecastChart data={history.data} selectedHorizon={horizon} />
                 </Suspense>
               ) : (
-                <p className="grid h-full place-items-center text-sm text-muted-foreground">Chưa có dữ liệu vận tốc.</p>
+                <p className="grid h-full place-items-center text-sm text-muted-foreground">{messages.traffic.noSpeedData}</p>
               )
             ) : (
               <Skeleton className="size-full rounded-xl" />
@@ -129,15 +138,14 @@ export default function NodeDetailPanel({ node, horizon, onClose }: Props) {
               <Separator className="my-3 bg-muted" />
               <div className="grid grid-cols-4 gap-2 text-center">
                 {history.data.forecasts.map((f) => {
-                  const m = STATUS_META[f.status]
                   const on = f.horizonMinutes === horizon
                   return (
                     <div key={f.horizonMinutes} className={`rounded-lg py-1.5 ${on ? 'bg-accent ring-1 ring-primary/40' : 'bg-muted/60'}`}>
-                      <p className="text-[10px] text-muted-foreground">+{HORIZON_LABEL[f.horizonMinutes]}</p>
+                      <p className="text-[10px] text-muted-foreground">+{messages.traffic.minutes(f.horizonMinutes)}</p>
                       <p data-traffic-status={f.status} className="traffic-text text-sm font-bold">
                         {f.status === 'UNKNOWN' ? '—' : pct(f.predictedSpeedRatio)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">{f.status === 'UNKNOWN' ? m.shortLabel : `${formatSpeed(f.predictedSpeedKmh)} km/h`}</p>
+                      <p className="text-[10px] text-muted-foreground">{f.status === 'UNKNOWN' ? messages.traffic[f.status] : `${formatSpeed(f.predictedSpeedKmh, locale)} km/h`}</p>
                     </div>
                   )
                 })}

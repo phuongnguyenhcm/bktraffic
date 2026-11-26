@@ -9,6 +9,7 @@ import type {
   ResolvedSegment,
   TrafficMapResponse,
 } from '@/types/traffic'
+import type { Messages } from '@/i18n/vi'
 
 /**
  * Tầng HTTP duy nhất của Frontend (Agents.md §6) — component không gọi fetch trực tiếp.
@@ -17,11 +18,13 @@ const apiUrl = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, '') ?? ''
 const TIMEOUT_MS = 10_000
 
 export class ApiError extends Error {
+  readonly code: keyof Messages['api']
   readonly status: number | null
 
-  constructor(message: string, status: number | null) {
-    super(message)
+  constructor(code: keyof Messages['api'], status: number | null) {
+    super(code)
     this.name = 'ApiError'
+    this.code = code
     this.status = status
   }
 }
@@ -33,6 +36,21 @@ function extractMessage(body: unknown): string | null {
   return typeof msg === 'string' ? msg : null
 }
 
+function responseError(path: string, status: number, body: unknown): ApiError {
+  if (path.startsWith('/topology/')) {
+    const detail = extractMessage(body) ?? ''
+    if (status === 404 && path.startsWith('/topology/resolve-segment')) return new ApiError('noSegment', status)
+    if (status === 503 && detail.includes('TOMTOM_API_KEY')) return new ApiError('tomtomKey', status)
+    if (status === 503) return new ApiError('tomtomUnavailable', status)
+    if (status === 504) return new ApiError('tomtomTimeout', status)
+    if (status === 502 && detail.includes('từ chối khóa API')) return new ApiError('tomtomRejected', status)
+    if (status === 502 && detail.includes('Không kết nối được với TomTom')) return new ApiError('tomtomConnection', status)
+    return new ApiError(path.startsWith('/topology/search-place') ? 'tomtomSearch' : 'tomtomSegment', status)
+  }
+  if (status === 400 && path === '/edge-nodes/generate-config') return new ApiError('configInvalid', status)
+  return new ApiError('http', status)
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const timeout = AbortSignal.timeout(TIMEOUT_MS)
   const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
@@ -42,19 +60,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     if (err instanceof DOMException && err.name === 'TimeoutError') {
-      throw new ApiError('Backend phản hồi quá chậm (timeout).', null)
+      throw new ApiError('timeout', null)
     }
-    throw new ApiError('Không kết nối được Backend. Hãy kiểm tra server NestJS đã chạy chưa.', null)
+    throw new ApiError('connection', null)
   }
   const body: unknown = await res.json().catch(() => null)
-  if (!res.ok) throw new ApiError(extractMessage(body) ?? `Lỗi máy chủ (${res.status})`, res.status)
-  if (body === null) throw new ApiError('Máy chủ trả về dữ liệu không hợp lệ.', res.status)
+  if (!res.ok) throw responseError(path, res.status, body)
+  if (body === null) throw new ApiError('invalidResponse', res.status)
   return body as T
 }
 
-export function toErrorMessage(err: unknown): string {
-  if (err instanceof ApiError) return err.message
-  return err instanceof Error ? err.message : 'Đã xảy ra lỗi không xác định'
+export function toErrorMessage(error: unknown, messages: Messages['api']): string {
+  if (!(error instanceof ApiError)) return messages.unknown
+  if (error.code === 'http') return error.status === null ? messages.unknown : messages.http(error.status)
+  return messages[error.code]
 }
 
 

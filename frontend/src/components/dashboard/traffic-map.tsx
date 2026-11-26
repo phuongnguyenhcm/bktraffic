@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useEffect, useEffectEvent, useMemo } from 'react'
 import { CircleMarker, MapContainer, Polyline, Tooltip, ZoomControl, useMap } from 'react-leaflet'
 import { latLngBounds } from 'leaflet'
@@ -39,6 +40,7 @@ interface Props {
 }
 
 export default function TrafficMap({ nodes, edges, selectedId, focusId, onSelect }: Props) {
+  const { messages, locale } = useLanguage()
   const selected = nodes.find((n) => n.id === focusId)
   const nodeName = useMemo(() => new Map(nodes.map((n) => [n.id, n.name])), [nodes])
   const center: [number, number] = nodes[0] ? [nodes[0].lat, nodes[0].lon] : [10.7726, 106.6634]
@@ -46,7 +48,7 @@ export default function TrafficMap({ nodes, edges, selectedId, focusId, onSelect
   return (
     <MapContainer id="traffic-map" center={center} zoom={15} className="traffic-map size-full" zoomControl={false} scrollWheelZoom={false}>
       <ThemedBasemap />
-      <ZoomControl position="topright" />
+      <ZoomControl key={locale} position="topright" zoomInTitle={messages.common.zoomIn} zoomOutTitle={messages.common.zoomOut} />
 
       {/* Lớp glow */}
       {edges.map((e) => {
@@ -83,7 +85,7 @@ export default function TrafficMap({ nodes, edges, selectedId, focusId, onSelect
                   {nodeName.get(e.fromNodeId)} {e.isOneWay ? '→' : '↔'} {nodeName.get(e.toNodeId)}
                 </p>
                 <p data-traffic-status={e.status} className="traffic-text">
-                  {m.shortLabel}{e.status !== 'UNKNOWN' && ` · ${pct(e.predictedSpeedRatio)} · ${formatSpeed(e.predictedSpeedKmh)} km/h`}
+                  {messages.traffic[e.status]}{e.status !== 'UNKNOWN' && ` · ${pct(e.predictedSpeedRatio)} · ${formatSpeed(e.predictedSpeedKmh, locale)} km/h`}
                 </p>
               </div>
             </Tooltip>
@@ -116,7 +118,7 @@ export default function TrafficMap({ nodes, edges, selectedId, focusId, onSelect
               <div className="text-xs">
                 <p className="font-semibold">{n.name}</p>
                 <p data-traffic-status={n.status} className="traffic-text">
-                  {m.shortLabel}{n.status !== 'UNKNOWN' && ` · ${pct(n.predictedSpeedRatio)} · ${formatSpeed(n.predictedSpeedKmh)} km/h`}
+                  {messages.traffic[n.status]}{n.status !== 'UNKNOWN' && ` · ${pct(n.predictedSpeedRatio)} · ${formatSpeed(n.predictedSpeedKmh, locale)} km/h`}
                 </p>
               </div>
             </Tooltip>

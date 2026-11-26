@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useEffect, type ReactNode } from 'react'
 import { divIcon } from 'leaflet'
 import { MapContainer, Marker, ZoomControl, useMap, useMapEvents } from 'react-leaflet'
@@ -50,12 +51,13 @@ interface Props {
 }
 
 export default function AreaMap({ id, label, className, onPick, initialCenter, fit, destination, pin, children }: Props) {
+  const { messages, locale } = useLanguage()
   return (
     <div role="region" aria-label={label} className={`isolate overflow-hidden rounded-xl border border-border ${className ?? 'h-[60vh] min-h-[480px]'}`}>
       <MapContainer id={id} center={initialCenter ?? DEFAULT_CENTER} zoom={15} zoomControl={false} scrollWheelZoom
         className={`traffic-map size-full ${onPick ? 'cursor-crosshair' : ''}`}>
         <ThemedBasemap />
-        <ZoomControl position="topright" />
+        <ZoomControl key={locale} position="topright" zoomInTitle={messages.common.zoomIn} zoomOutTitle={messages.common.zoomOut} />
         <MapEvents onPick={onPick} fit={fit} destination={destination} />
         {pin && <Marker position={pin} icon={pinIcon} keyboard={false} interactive={false} />}
         {children}

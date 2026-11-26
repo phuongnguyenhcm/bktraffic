@@ -1,7 +1,8 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import type { MapNode } from '@/types/traffic'
-import { STATUS_META, formatSpeed, pct } from '@/lib/traffic'
+import { formatSpeed, pct } from '@/lib/traffic'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -17,6 +18,7 @@ interface Props {
 
 /** Danh sách node — sắp xếp ưu tiên điểm ùn tắc lên đầu (bảng cảnh báo) */
 export default function NodeList({ nodes, loading, selectedId, onSelect }: Props) {
+  const { messages, locale } = useLanguage()
   const [q, setQ] = useState('')
   const filtered = useMemo(() => {
     const k = q.trim().toLowerCase()
@@ -30,7 +32,7 @@ export default function NodeList({ nodes, loading, selectedId, onSelect }: Props
       <div className="border-b border-border p-3">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input id="node-search" aria-label="Tìm điểm giao thông" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Tìm điểm giao thông…" className="h-9 bg-background pl-9" />
+          <Input id="node-search" aria-label={messages.traffic.searchNodes} value={q} onChange={(e) => setQ(e.target.value)} placeholder={messages.traffic.searchNodesPlaceholder} className="h-9 bg-background pl-9" />
         </label>
       </div>
       <ul className="grid gap-1 p-2 sm:grid-cols-2">
@@ -42,9 +44,8 @@ export default function NodeList({ nodes, loading, selectedId, onSelect }: Props
               <Skeleton className="h-3 w-1/3" />
             </li>
           ))}
-        {nodes && filtered.length === 0 && <li className="p-4 text-center text-sm text-muted-foreground">Không tìm thấy điểm phù hợp</li>}
+        {nodes && filtered.length === 0 && <li className="p-4 text-center text-sm text-muted-foreground">{messages.traffic.noMatchingNodes}</li>}
         {filtered.map((n) => {
-          const m = STATUS_META[n.status]
           const active = n.id === selectedId
           return (
             <li key={n.id}>
@@ -61,14 +62,14 @@ export default function NodeList({ nodes, loading, selectedId, onSelect }: Props
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">{n.name}</span>
                   <span className="text-xs text-muted-foreground">
-                    #{n.index} · {n.status === 'UNKNOWN' ? m.shortLabel : `${formatSpeed(n.predictedSpeedKmh)} km/h`}
+                    #{n.index} · {n.status === 'UNKNOWN' ? messages.traffic[n.status] : `${formatSpeed(n.predictedSpeedKmh, locale)} km/h`}
                   </span>
                 </span>
                 <span className="text-right">
                   <span className="traffic-text block text-base font-bold">
                     {n.status === 'UNKNOWN' ? '—' : pct(n.predictedSpeedRatio)}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">lưu thông</span>
+                  <span className="text-[10px] text-muted-foreground">{messages.traffic.flowShort}</span>
                 </span>
               </button>
             </li>
@@ -79,7 +80,7 @@ export default function NodeList({ nodes, loading, selectedId, onSelect }: Props
         {(['CLEAR', 'MODERATE', 'CONGESTED', 'UNKNOWN'] as const).map((s) => (
           <span key={s} data-traffic-status={s} className="flex items-center gap-1.5">
             <i className="traffic-dot size-2 rounded-full" aria-hidden />
-            {STATUS_META[s].shortLabel}
+            {messages.traffic[s]}
           </span>
         ))}
       </div>

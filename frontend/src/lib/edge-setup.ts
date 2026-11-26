@@ -1,4 +1,5 @@
 import type { GenerateConfigRequest, GeometryMode, LatLon } from '@/types/traffic'
+import type { Messages } from '@/i18n/vi'
 
 export interface MonitoringPoint {
   id: string
@@ -57,7 +58,7 @@ function conflicts(existing: Map<string, boolean>, link: Pick<MonitoringLink, 'f
   return existing.has(linkKey(link.from, link.to)) || existing.get(reverse) === false || (!link.isOneWay && existing.has(reverse))
 }
 
-export function appendArea(area: MonitoringArea, draft: AreaDraft): MonitoringArea {
+export function appendArea(area: MonitoringArea, draft: AreaDraft): MonitoringArea | null {
   const points = [...area.points]
   const links = [...area.links]
   const byCoordinate = new Map(points.map((point) => [coordinateKey(point.coordinates), point.id]))
@@ -96,13 +97,14 @@ export function appendArea(area: MonitoringArea, draft: AreaDraft): MonitoringAr
     links.push({ ...entry, key: nextLinkKey() })
   }
 
-  if (points.length > MAX_POINTS || links.length > MAX_LINKS) {
-    throw new Error('Cấu hình hỗ trợ tối đa 500 điểm đo và 2.000 kết nối.')
-  }
+  if (points.length > MAX_POINTS || links.length > MAX_LINKS) return null
   return { points, links }
 }
 
-export function buildAreaRequest({ points, links }: MonitoringArea): {
+export function buildAreaRequest(
+  { points, links }: MonitoringArea,
+  messages: Pick<Messages['setup'], 'invalidConnection' | 'duplicateConnection'>,
+): {
   request: Pick<GenerateConfigRequest, 'nodes' | 'connections'> | null
   errors: string[]
 } {
@@ -112,9 +114,9 @@ export function buildAreaRequest({ points, links }: MonitoringArea): {
   const seen = new Map<string, boolean>()
   const connections = links.map((link, index) => {
     if (!ids.has(link.from) || !ids.has(link.to) || link.from === link.to) {
-      errors.push(`Kết nối ${index + 1}: chọn hai điểm đo khác nhau.`)
+      errors.push(messages.invalidConnection(index + 1))
     } else if (conflicts(seen, link)) {
-      errors.push(`Kết nối ${index + 1} bị trùng.`)
+      errors.push(messages.duplicateConnection(index + 1))
     }
     seen.set(linkKey(link.from, link.to), link.isOneWay)
     const { from, to, geometryMode, isOneWay, polyline } = link

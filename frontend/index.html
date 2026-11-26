@@ -7,6 +7,9 @@
         let theme
         try { theme = localStorage.getItem('traffic-ui-theme') } catch {}
         document.documentElement.classList.toggle('dark', theme === 'dark')
+        try {
+          if (localStorage.getItem('app-language') === 'en') document.documentElement.lang = 'en'
+        } catch {}
       })()
     </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />

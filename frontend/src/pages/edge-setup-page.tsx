@@ -1,3 +1,4 @@
+import { useLanguage } from '@/i18n/use-language'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
@@ -25,9 +26,9 @@ import { cn } from '@/lib/utils'
 const CONFIG_FILE_NAME = 'edge-agent-config.json'
 const DOCKER_LABEL = 'Docker Container'
 const STEPS = [
-  { n: 1, title: 'Thông tin thiết bị' },
-  { n: 2, title: 'Khu vực giám sát' },
-  { n: 3, title: 'Tải gói cài đặt' },
+  { n: 1, title: 'device' },
+  { n: 2, title: 'area' },
+  { n: 3, title: 'packageStep' },
 ] as const
 
 type Step = 1 | 2 | 3
@@ -50,6 +51,7 @@ const slug = (s: string): string =>
     .replace(/^-|-$/g, '') || 'edge-agent'
 
 function Stepper({ step }: { step: Step }) {
+  const { messages } = useLanguage()
   return (
     <ol className="flex items-center gap-2 sm:gap-4">
       {STEPS.map((s, i) => {
@@ -69,7 +71,7 @@ function Stepper({ step }: { step: Step }) {
               >
                 {done ? <Check className="size-4" /> : s.n}
               </span>
-              <span className={cn('sr-only text-sm font-medium sm:not-sr-only', active ? 'text-foreground' : 'text-muted-foreground')}>{s.title}</span>
+              <span className={cn('sr-only text-sm font-medium sm:not-sr-only', active ? 'text-foreground' : 'text-muted-foreground')}>{messages.setup[s.title]}</span>
             </div>
             {i < STEPS.length - 1 && <span className={cn('h-px flex-1', done ? 'bg-clear/60' : 'bg-accent')} />}
           </li>
@@ -80,6 +82,7 @@ function Stepper({ step }: { step: Step }) {
 }
 
 function CopyLine({ id, command }: { id: string; command: string }) {
+  const { messages } = useLanguage()
   const [feedback, setFeedback] = useState<'copied' | 'unavailable' | null>(null)
   const copy = async (): Promise<void> => {
     try {
@@ -96,13 +99,13 @@ function CopyLine({ id, command }: { id: string; command: string }) {
         <code id={id} className="min-w-0 flex-1 font-mono text-[11.5px] leading-relaxed break-all text-foreground">
           {command}
         </code>
-        <Button variant="ghost" size="icon-sm" onClick={() => void copy()} aria-label="Sao chép lệnh">
+        <Button variant="ghost" size="icon-sm" onClick={() => void copy()} aria-label={messages.setup.copy}>
           {feedback === 'copied' ? <Check className="text-clear" /> : <Copy />}
         </Button>
       </div>
       {feedback && (
         <p role="status" className="text-xs text-muted-foreground">
-          {feedback === 'copied' ? 'Đã sao chép lệnh.' : 'Hãy chọn văn bản và sao chép lệnh thủ công.'}
+          {feedback === 'copied' ? messages.setup.copied : messages.setup.copyManually}
         </p>
       )}
     </div>
@@ -110,6 +113,7 @@ function CopyLine({ id, command }: { id: string; command: string }) {
 }
 
 export default function EdgeSetupPage() {
+  const { messages } = useLanguage()
   const [step, setStep] = useState<Step>(1)
 
   // Bước 1
@@ -122,17 +126,21 @@ export default function EdgeSetupPage() {
   // Bước 3
   const [pkg, setPkg] = useState<EdgeAgentPackage | null>(null)
   const [generating, setGenerating] = useState(false)
-  const [genError, setGenError] = useState<string | null>(null)
+  const [generationFailure, setGenerationFailure] = useState<{ error: unknown } | null>(null)
   const [downloaded, setDownloaded] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   const hasAgentName = Boolean(agentName.trim())
-  const area = useMemo(() => buildAreaRequest(monitoringArea), [monitoringArea])
+  const area = useMemo(() => buildAreaRequest(monitoringArea, messages.setup), [monitoringArea, messages.setup])
+  const error = generationFailure?.error
+  const genError = error instanceof ApiError && error.status === 413
+    ? messages.setup.configTooLarge
+    : generationFailure && toErrorMessage(error, messages.api)
 
   const goToPackage = async (): Promise<void> => {
     if (!area.request) return
     setGenerating(true)
-    setGenError(null)
+    setGenerationFailure(null)
     setDownloaded(false)
     try {
       const res = await generateEdgeConfig({ agentName: agentName.trim(), ...area.request })
@@ -145,9 +153,7 @@ export default function EdgeSetupPage() {
       })
       setStep(3)
     } catch (e) {
-      setGenError(e instanceof ApiError && e.status === 413
-        ? 'Cấu hình quá lớn để gửi. Hãy giảm số cung đường hoặc dùng tệp ít tọa độ hơn.'
-        : toErrorMessage(e))
+      setGenerationFailure({ error: e })
     } finally {
       setGenerating(false)
     }
@@ -166,18 +172,18 @@ export default function EdgeSetupPage() {
   }
 
   const agentSlug = slug(agentName).slice(0, 63)
-  const dockerCommand = `docker run -d --name ${agentSlug} --restart unless-stopped --mount "type=bind,source=$PWD/${CONFIG_FILE_NAME},target=/app/${CONFIG_FILE_NAME},readonly" "${'$'}{EDGE_CLIENT_IMAGE:?Chưa đặt EDGE_CLIENT_IMAGE}" --config /app/${CONFIG_FILE_NAME}`
+  const dockerCommand = `docker run -d --name ${agentSlug} --restart unless-stopped --mount "type=bind,source=$PWD/${CONFIG_FILE_NAME},target=/app/${CONFIG_FILE_NAME},readonly" "${'$'}{EDGE_CLIENT_IMAGE:?${messages.setup.dockerImageMissing}}" --config /app/${CONFIG_FILE_NAME}`
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8 py-10">
+    <div className="space-y-8 py-10">
       <header className="space-y-4">
         <Link to="/edge-nodes" id="setup-back" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="size-4" /> Mạng lưới Edge Agents
+          <ArrowLeft className="size-4" /> {messages.agents.network}
         </Link>
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">Triển khai Edge Node mới</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{messages.agents.deploy}</h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Đặt tên Agent, khai báo điểm đo và chuẩn bị cấu hình Edge Client chạy bằng Docker.
+            {messages.setup.intro}
           </p>
         </div>
         <Stepper step={step} />
@@ -188,27 +194,27 @@ export default function EdgeSetupPage() {
           {/* ───────── Bước 1 ───────── */}
           {step === 1 && (
             <div className="space-y-6">
-              <h2 className="text-lg font-semibold text-foreground">Thông tin thiết bị</h2>
+              <h2 className="text-lg font-semibold text-foreground">{messages.setup.device}</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block space-y-1.5">
-                  <span className="eyebrow">Tên Agent</span>
-                  <Input id="agent-name" required maxLength={80} value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder="vd: Agent Lý Thường Kiệt" className="bg-background" />
+                  <span className="eyebrow">{messages.setup.agentName}</span>
+                  <Input id="agent-name" required maxLength={80} value={agentName} onChange={(e) => setAgentName(e.target.value)} placeholder={messages.setup.agentPlaceholder} className="bg-background" />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="eyebrow">Khu vực quản lý (không bắt buộc)</span>
-                  <Input id="agent-region" maxLength={120} value={region} onChange={(e) => setRegion(e.target.value)} placeholder="vd: Quận 10 – TP.HCM" className="bg-background" />
+                  <span className="eyebrow">{messages.setup.regionOptional}</span>
+                  <Input id="agent-region" maxLength={120} value={region} onChange={(e) => setRegion(e.target.value)} placeholder={messages.setup.regionPlaceholder} className="bg-background" />
                 </label>
               </div>
               <div>
-                <p className="eyebrow">Nền tảng thiết bị biên</p>
+                <p className="eyebrow">{messages.setup.platform}</p>
                 <div className="mt-2 flex max-w-sm items-start gap-3 rounded-xl border border-primary/60 bg-primary/10 p-4 shadow-panel">
                   <Box className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-foreground">{DOCKER_LABEL}</p>
-                    <p className="text-xs text-muted-foreground">Mọi máy có Docker Engine</p>
+                    <p className="text-xs text-muted-foreground">{messages.setup.dockerHint}</p>
                   </div>
                   <Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-                  <span className="sr-only">Đã chọn</span>
+                  <span className="sr-only">{messages.setup.selected}</span>
                 </div>
               </div>
             </div>
@@ -217,10 +223,10 @@ export default function EdgeSetupPage() {
           {/* ───────── Bước 2 ───────── */}
           {step === 2 && (
             <fieldset disabled={generating} className="min-w-0">
-              <legend className="mb-4 text-lg font-semibold text-foreground">Khu vực giám sát</legend>
+              <legend className="mb-4 text-lg font-semibold text-foreground">{messages.setup.area}</legend>
               <MonitoringAreaEditor area={monitoringArea} onChange={(area) => {
                 setMonitoringArea(area)
-                setGenError(null)
+                setGenerationFailure(null)
               }} />
             </fieldset>
           )}
@@ -233,25 +239,25 @@ export default function EdgeSetupPage() {
                   <PackageCheck className="size-7 text-clear" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">Gói cài đặt Edge Client</h2>
+                  <h2 className="text-xl font-bold text-foreground">{messages.setup.packageTitle}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {pkg.agent.name} · {DOCKER_LABEL}{pkg.agent.region && ` · ${pkg.agent.region}`} · {Object.keys(pkg.nodes).length} điểm đo ·{' '}
-                    {pkg.connections.length} tuyến
+                    {pkg.agent.name} · {DOCKER_LABEL}{pkg.agent.region && ` · ${pkg.agent.region}`} · {messages.setup.pointCount(Object.keys(pkg.nodes).length)} ·{' '}
+                    {messages.setup.routeCount(pkg.connections.length)}
                   </p>
                 </div>
-                <p className="text-xs text-muted-foreground">Bản demo xuất cấu hình tích hợp dưới dạng <code>{CONFIG_FILE_NAME}</code>.</p>
+                <p className="text-xs text-muted-foreground">{messages.setup.configExport(CONFIG_FILE_NAME)}</p>
                 <Button id="download-package" size="lg" className="glow-btn h-auto min-h-11 px-4 py-2 text-sm whitespace-normal sm:px-6" onClick={download}>
-                  <Download /> Tải gói cài đặt Edge Agent (Đã tích hợp cấu hình)
+                  <Download /> {messages.setup.download}
                 </Button>
                 {downloaded && (
                   <div id="download-guide" role="status" className="w-full max-w-xl rounded-xl border border-border bg-background p-4 text-left text-sm">
                     <p className="flex items-center gap-2 font-semibold text-clear">
-                      <CheckCircle2 className="size-4" /> Cấu hình đã được gửi vào mục tải xuống
+                      <CheckCircle2 className="size-4" /> {messages.setup.downloaded}
                     </p>
                     <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-foreground">
-                      <li>Chép file cấu hình vào thư mục sẽ chạy Edge Client trên thiết bị.</li>
-                      <li>Khi có bản phát hành Edge Client, chạy lệnh Docker bên dưới từ thư mục đó.</li>
-                      <li>Kiểm tra trạng thái Agent trên trang Mạng lưới Edge Agents sau khi Agent kết nối.</li>
+                      <li>{messages.setup.copyFile}</li>
+                      <li>{messages.setup.runDocker}</li>
+                      <li>{messages.setup.checkAgent}</li>
                     </ol>
                   </div>
                 )}
@@ -259,12 +265,12 @@ export default function EdgeSetupPage() {
 
               <details className="group rounded-xl border border-border">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground">
-                  Xem lệnh chạy bằng Docker
+                  {messages.setup.showDocker}
                   <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" />
                 </summary>
                 <div className="space-y-3 border-t border-border px-4 py-3">
                   <p className="text-xs text-muted-foreground">
-                    Lệnh mẫu dùng image từ bản phát hành Edge Client. Đặt EDGE_CLIENT_IMAGE thành tên và tag của image đó.
+                    {messages.setup.dockerInstructions}
                   </p>
                   <CopyLine id="installer-command-docker" command={dockerCommand} />
                 </div>
@@ -278,7 +284,7 @@ export default function EdgeSetupPage() {
                   onClick={() => setShowPreview((s) => !s)}
                   className="flex w-full items-center justify-between px-4 py-3 text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Xem cấu hình Edge Agent
+                  {messages.setup.showConfig}
                   <ChevronDown className={cn('size-4 transition-transform', showPreview && 'rotate-180')} />
                 </button>
                 {showPreview && (
@@ -294,11 +300,11 @@ export default function EdgeSetupPage() {
         {/* Thanh điều hướng wizard */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
           <div className="min-w-0 text-xs text-moderate">
-            {step === 1 && !hasAgentName && <span>• Nhập tên Agent</span>}
+            {step === 1 && !hasAgentName && <span>• {messages.setup.enterName}</span>}
             {step === 2 && area.errors.length > 0 && (
               <span>
                 • {area.errors[0]}
-                {area.errors.length > 1 && ` (+${area.errors.length - 1} lỗi khác)`}
+                {area.errors.length > 1 && ` (${messages.setup.moreErrors(area.errors.length - 1)})`}
               </span>
             )}
             {step === 2 && genError && <span role="alert" className="text-congested">{genError}</span>}
@@ -306,22 +312,22 @@ export default function EdgeSetupPage() {
           <div className="flex gap-2">
             {step > 1 && (
               <Button id="wizard-back" variant="outline" disabled={generating} onClick={() => setStep(step === 3 ? 2 : 1)}>
-                <ArrowLeft /> Quay lại
+                <ArrowLeft /> {messages.setup.back}
               </Button>
             )}
             {step === 1 && (
               <Button id="wizard-next-1" className="glow-btn" disabled={!hasAgentName} onClick={() => setStep(2)}>
-                Tiếp tục <ArrowRight />
+                {messages.setup.next} <ArrowRight />
               </Button>
             )}
             {step === 2 && (
               <Button id="wizard-next-2" className="glow-btn" disabled={!area.request || generating} onClick={() => void goToPackage()}>
-                {generating ? <Loader2 className="animate-spin" /> : <PackageCheck />} Tạo gói cài đặt
+                {generating ? <Loader2 className="animate-spin" /> : <PackageCheck />} {messages.setup.create}
               </Button>
             )}
             {step === 3 && (
               <Link to="/edge-nodes" id="wizard-finish" className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-muted">
-                Hoàn tất <Check className="size-4" />
+                {messages.setup.finish} <Check className="size-4" />
               </Link>
             )}
           </div>
