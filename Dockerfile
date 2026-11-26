@@ -9,12 +9,12 @@ COPY src/ ./src/
 RUN npm run build
 
 FROM base AS runtime
+WORKDIR /app/backend
 ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist/ ./dist/
-# Nếu bạn có copy sẵn thư mục build FE vào ./public hoặc ./frontend/dist thì bỏ comment dòng dưới:
-# COPY frontend/dist/ ./frontend/dist/
+COPY frontend/dist/ /app/frontend/dist/
 
 USER node
 EXPOSE 3000

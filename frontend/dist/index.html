@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      (() => {
+        let theme
+        try { theme = localStorage.getItem('traffic-ui-theme') } catch {}
+        document.documentElement.classList.toggle('dark', theme === 'dark')
+        try {
+          if (localStorage.getItem('app-language') === 'en') document.documentElement.lang = 'en'
+        } catch {}
+      })()
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>bktraffic — Dự báo vận tốc giao thông thời gian thực (LSTM-FedProx)</title>
+    <meta name="description" content="Hệ thống dự báo vận tốc giao thông thời gian thực tại node biên sử dụng Federated LSTM-FedProx trong kiến trúc Node-Agent." />
+    <script type="module" crossorigin src="/assets/index-RJqncgsm.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/use-language-CJoXSwri.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-dom-BXHvgiuY.js">
+    <link rel="modulepreload" crossorigin href="/assets/badge-BEd877Yp.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-B9pPN3Tx.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
